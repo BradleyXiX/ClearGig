@@ -14,6 +14,11 @@ export default function ProjectDetail() {
   
   const [project, setProject] = useState<Project | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  
+  // Local state for global toggles
+  const [contingencyPercentage, setContingencyPercentage] = useState(0);
+  const [profitMargin, setProfitMargin] = useState(0);
   
   // Local state for UI form
   const [category, setCategory] = useState('FRONTEND');
@@ -30,6 +35,8 @@ export default function ProjectDetail() {
     try {
       const data = await api.getProjectById(id);
       setProject(data);
+      setContingencyPercentage(Number(data.contingencyPercentage) || 0);
+      setProfitMargin(Number(data.profitMargin) || 0);
     } catch (error) {
       console.error('Error loading project:', error);
     } finally {
@@ -60,6 +67,22 @@ export default function ProjectDetail() {
       loadProject();
     } catch (error) {
       console.error('Error adding line item:', error);
+    }
+  };
+
+  const handleSaveProject = async () => {
+    setIsSaving(true);
+    try {
+      await api.updateProject(id, {
+        contingency_percentage: contingencyPercentage,
+        profit_margin: profitMargin,
+      });
+      // Optionally reload to ensure sync, though we have local state
+      await loadProject();
+    } catch (error) {
+      console.error('Error saving project:', error);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -106,9 +129,13 @@ export default function ProjectDetail() {
             <span className="px-3 py-1 bg-secondary text-secondary-foreground rounded-full text-sm font-medium">
               {project.status}
             </span>
-            <button className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 shadow-sm">
+            <button 
+              onClick={handleSaveProject}
+              disabled={isSaving}
+              className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 shadow-sm disabled:opacity-70"
+            >
               <Save className="w-4 h-4" />
-              Save Estimate
+              {isSaving ? 'Saving...' : 'Save Estimate'}
             </button>
           </div>
         </div>
@@ -203,8 +230,8 @@ export default function ProjectDetail() {
           <SummaryPanel 
             baseCost={baseCost} 
             recurringCost={recurringCost}
-            contingencyPercentage={Number(project.contingencyPercentage) || 0}
-            profitMargin={Number(project.profitMargin) || 0}
+            contingencyPercentage={contingencyPercentage}
+            profitMargin={profitMargin}
           />
 
           <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
@@ -213,30 +240,28 @@ export default function ProjectDetail() {
               <div>
                 <label className="flex justify-between text-sm font-medium text-muted-foreground mb-2">
                   <span>Contingency Buffer</span>
-                  <span>{project.contingencyPercentage}%</span>
+                  <span>{contingencyPercentage}%</span>
                 </label>
                 <input 
                   type="range" 
                   min="0" max="50" step="5"
-                  value={Number(project.contingencyPercentage)}
-                  readOnly
+                  value={contingencyPercentage}
+                  onChange={(e) => setContingencyPercentage(Number(e.target.value))}
                   className="w-full accent-primary"
                 />
-                <p className="text-xs text-muted-foreground mt-1 text-right">Edit not implemented yet</p>
               </div>
               <div>
                 <label className="flex justify-between text-sm font-medium text-muted-foreground mb-2">
                   <span>Profit Margin</span>
-                  <span>{project.profitMargin}%</span>
+                  <span>{profitMargin}%</span>
                 </label>
                 <input 
                   type="range" 
                   min="0" max="100" step="5"
-                  value={Number(project.profitMargin)}
-                  readOnly
+                  value={profitMargin}
+                  onChange={(e) => setProfitMargin(Number(e.target.value))}
                   className="w-full accent-primary"
                 />
-                 <p className="text-xs text-muted-foreground mt-1 text-right">Edit not implemented yet</p>
               </div>
             </div>
           </div>

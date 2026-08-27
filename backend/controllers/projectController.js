@@ -60,6 +60,30 @@ exports.getProjectById = async (req, res, next) => {
   }
 };
 
+exports.updateProject = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { contingency_percentage, profit_margin, title, status } = req.body;
+
+    const project = await prisma.project.update({
+      where: { id },
+      data: {
+        ...(title !== undefined && { title }),
+        ...(status !== undefined && { status }),
+        ...(contingency_percentage !== undefined && { contingencyPercentage: contingency_percentage }),
+        ...(profit_margin !== undefined && { profitMargin: profit_margin }),
+      },
+    });
+
+    res.status(200).json(project);
+  } catch (error) {
+    if (error.code === 'P2025') {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+    next(error);
+  }
+};
+
 exports.addLineItemToProject = async (req, res, next) => {
   try {
     const { id } = req.params;

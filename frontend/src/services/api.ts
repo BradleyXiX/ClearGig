@@ -45,7 +45,26 @@ export interface CreateLineItemDTO {
   is_recurring?: boolean;
 }
 
+export interface UpdateProjectDTO {
+  title?: string;
+  status?: string;
+  contingency_percentage?: number;
+  profit_margin?: number;
+}
+
 export const api = {
+  async updateProject(id: string, data: UpdateProjectDTO): Promise<Project> {
+    const response = await fetch(`${API_BASE_URL}/projects/${id}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) throw new Error('Failed to update project');
+    return response.json();
+  },
+
   async getProjects(): Promise<Project[]> {
     const response = await fetch(`${API_BASE_URL}/projects`);
     if (!response.ok) throw new Error('Failed to fetch projects');
