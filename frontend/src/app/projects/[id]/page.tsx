@@ -19,6 +19,7 @@ export default function ProjectDetail() {
   // Local state for global toggles
   const [contingencyPercentage, setContingencyPercentage] = useState(0);
   const [profitMargin, setProfitMargin] = useState(0);
+  const [status, setStatus] = useState<Project['status']>('DRAFT');
   
   // Local state for UI form
   const [category, setCategory] = useState('FRONTEND');
@@ -37,6 +38,7 @@ export default function ProjectDetail() {
       setProject(data);
       setContingencyPercentage(Number(data.contingencyPercentage) || 0);
       setProfitMargin(Number(data.profitMargin) || 0);
+      setStatus(data.status);
     } catch (error) {
       console.error('Error loading project:', error);
     } finally {
@@ -76,6 +78,7 @@ export default function ProjectDetail() {
       await api.updateProject(id, {
         contingency_percentage: contingencyPercentage,
         profit_margin: profitMargin,
+        status: status,
       });
       // Optionally reload to ensure sync, though we have local state
       await loadProject();
@@ -112,6 +115,8 @@ export default function ProjectDetail() {
   const baseCost = project.lineItems?.filter(i => !i.isRecurring).reduce((sum, item) => sum + (Number(item.estimatedHours) * Number(item.hourlyRate)), 0) || 0;
   const recurringCost = project.lineItems?.filter(i => i.isRecurring).reduce((sum, item) => sum + (Number(item.estimatedHours) * Number(item.hourlyRate)), 0) || 0;
 
+  const isLocked = status !== 'DRAFT';
+
   return (
     <div className="min-h-screen p-8 max-w-7xl mx-auto">
       <header className="mb-8">
@@ -126,9 +131,16 @@ export default function ProjectDetail() {
             <p className="text-muted-foreground mt-1">Client ID: {project.clientId}</p>
           </div>
           <div className="flex items-center gap-3">
-            <span className="px-3 py-1 bg-secondary text-secondary-foreground rounded-full text-sm font-medium">
-              {project.status}
-            </span>
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value as Project['status'])}
+              className="bg-secondary text-secondary-foreground border border-border rounded-md text-sm font-medium px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/50 cursor-pointer"
+            >
+              <option value="DRAFT">DRAFT</option>
+              <option value="SENT">SENT</option>
+              <option value="ACCEPTED">ACCEPTED</option>
+              <option value="REJECTED">REJECTED</option>
+            </select>
             <button 
               onClick={handleSaveProject}
               disabled={isSaving}
@@ -144,84 +156,94 @@ export default function ProjectDetail() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8">
           {/* Add Line Item Form */}
-          <div className="bg-card border border-border rounded-xl p-6 shadow-sm glass">
-            <h2 className="text-lg font-semibold mb-4 text-foreground">Add Line Item</h2>
-            <form onSubmit={handleAddLineItem} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-muted-foreground mb-1">Category</label>
-                  <select 
-                    value={category} 
-                    onChange={(e) => setCategory(e.target.value)}
-                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+          {isLocked ? (
+            <div className="bg-card/50 border border-border rounded-xl p-8 shadow-sm flex flex-col items-center justify-center text-center">
+              <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center mb-4">
+                <Save className="w-6 h-6 text-muted-foreground" />
+              </div>
+              <h2 className="text-lg font-semibold text-foreground">Estimate is Locked</h2>
+              <p className="text-muted-foreground mt-1 max-w-sm">This project is currently marked as <span className="font-semibold">{status}</span>. Change the status back to DRAFT to add more line items.</p>
+            </div>
+          ) : (
+            <div className="bg-card border border-border rounded-xl p-6 shadow-sm glass">
+              <h2 className="text-lg font-semibold mb-4 text-foreground">Add Line Item</h2>
+              <form onSubmit={handleAddLineItem} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-muted-foreground mb-1">Category</label>
+                    <select 
+                      value={category} 
+                      onChange={(e) => setCategory(e.target.value)}
+                      className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    >
+                      <option value="FRONTEND">Frontend</option>
+                      <option value="BACKEND">Backend</option>
+                      <option value="CLOUD">Cloud/DevOps</option>
+                      <option value="MAINTENANCE">Maintenance</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-muted-foreground mb-1">Description</label>
+                    <input 
+                      type="text" 
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      placeholder="e.g., Set up authentication"
+                      required
+                      className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-muted-foreground mb-1">Estimated Hours</label>
+                    <input 
+                      type="number" 
+                      min="0" step="0.5"
+                      value={estimatedHours}
+                      onChange={(e) => setEstimatedHours(e.target.value)}
+                      required
+                      className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-muted-foreground mb-1">Hourly Rate ($)</label>
+                    <input 
+                      type="number" 
+                      min="0"
+                      value={hourlyRate}
+                      onChange={(e) => setHourlyRate(e.target.value)}
+                      required
+                      className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center justify-between pt-2 border-t border-border mt-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      checked={isRecurring}
+                      onChange={(e) => setIsRecurring(e.target.checked)}
+                      className="rounded border-border text-primary focus:ring-primary w-4 h-4"
+                    />
+                    <span className="text-sm font-medium text-foreground">Recurring Monthly Cost</span>
+                  </label>
+                  <button 
+                    type="submit"
+                    className="px-4 py-2 rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors flex items-center gap-2"
                   >
-                    <option value="FRONTEND">Frontend</option>
-                    <option value="BACKEND">Backend</option>
-                    <option value="CLOUD">Cloud/DevOps</option>
-                    <option value="MAINTENANCE">Maintenance</option>
-                  </select>
+                    <Plus className="w-4 h-4" />
+                    Add Item
+                  </button>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-muted-foreground mb-1">Description</label>
-                  <input 
-                    type="text" 
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder="e.g., Set up authentication"
-                    required
-                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-muted-foreground mb-1">Estimated Hours</label>
-                  <input 
-                    type="number" 
-                    min="0" step="0.5"
-                    value={estimatedHours}
-                    onChange={(e) => setEstimatedHours(e.target.value)}
-                    required
-                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-muted-foreground mb-1">Hourly Rate ($)</label>
-                  <input 
-                    type="number" 
-                    min="0"
-                    value={hourlyRate}
-                    onChange={(e) => setHourlyRate(e.target.value)}
-                    required
-                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                  />
-                </div>
-              </div>
-              <div className="flex items-center justify-between pt-2 border-t border-border mt-4">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input 
-                    type="checkbox" 
-                    checked={isRecurring}
-                    onChange={(e) => setIsRecurring(e.target.checked)}
-                    className="rounded border-border text-primary focus:ring-primary w-4 h-4"
-                  />
-                  <span className="text-sm font-medium text-foreground">Recurring Monthly Cost</span>
-                </label>
-                <button 
-                  type="submit"
-                  className="px-4 py-2 rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors flex items-center gap-2"
-                >
-                  <Plus className="w-4 h-4" />
-                  Add Item
-                </button>
-              </div>
-            </form>
-          </div>
+              </form>
+            </div>
+          )}
 
           {/* Line Items Table */}
           <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
             <div className="p-6 border-b border-border">
               <h2 className="text-lg font-semibold text-foreground">Estimate Breakdown</h2>
             </div>
-            <LineItemTable items={project.lineItems || []} onDelete={handleDeleteLineItem} />
+            <LineItemTable items={project.lineItems || []} onDelete={handleDeleteLineItem} isLocked={isLocked} />
           </div>
         </div>
 
@@ -247,7 +269,8 @@ export default function ProjectDetail() {
                   min="0" max="50" step="5"
                   value={contingencyPercentage}
                   onChange={(e) => setContingencyPercentage(Number(e.target.value))}
-                  className="w-full accent-primary"
+                  disabled={isLocked}
+                  className={`w-full accent-primary ${isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
                 />
               </div>
               <div>
@@ -260,7 +283,8 @@ export default function ProjectDetail() {
                   min="0" max="100" step="5"
                   value={profitMargin}
                   onChange={(e) => setProfitMargin(Number(e.target.value))}
-                  className="w-full accent-primary"
+                  disabled={isLocked}
+                  className={`w-full accent-primary ${isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
                 />
               </div>
             </div>

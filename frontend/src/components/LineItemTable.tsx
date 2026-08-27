@@ -4,9 +4,10 @@ import { LineItem } from '../services/api';
 interface LineItemTableProps {
   items: LineItem[];
   onDelete: (id: string) => void;
+  isLocked?: boolean;
 }
 
-export default function LineItemTable({ items, onDelete }: LineItemTableProps) {
+export default function LineItemTable({ items, onDelete, isLocked = false }: LineItemTableProps) {
   if (items.length === 0) {
     return (
       <div className="text-center py-8 bg-secondary/50 rounded-xl border border-dashed border-border">
@@ -48,13 +49,15 @@ export default function LineItemTable({ items, onDelete }: LineItemTableProps) {
                 ${(Number(item.estimatedHours) * Number(item.hourlyRate)).toLocaleString()}
               </td>
               <td className="px-4 py-3 text-right">
-                <button
-                  onClick={() => onDelete(item.id)}
-                  className="p-1.5 text-muted-foreground hover:text-red-500 rounded-md hover:bg-red-50 dark:hover:bg-red-950/50 transition-colors"
-                  title="Delete item"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                {!isLocked && (
+                  <button
+                    onClick={() => onDelete(item.id)}
+                    className="p-1.5 text-muted-foreground hover:text-red-500 rounded-md hover:bg-red-50 dark:hover:bg-red-950/50 transition-colors"
+                    title="Delete item"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
               </td>
             </tr>
           ))}
