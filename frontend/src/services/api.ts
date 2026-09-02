@@ -30,6 +30,11 @@ export interface Project {
   lineItems?: LineItem[];
 }
 
+export interface CreateClientDTO {
+  name: string;
+  email?: string;
+}
+
 export interface CreateProjectDTO {
   client_id: string;
   title: string;
@@ -53,6 +58,24 @@ export interface UpdateProjectDTO {
 }
 
 export const api = {
+  async getClients(): Promise<Client[]> {
+    const response = await fetch(`${API_BASE_URL}/clients`);
+    if (!response.ok) throw new Error('Failed to fetch clients');
+    return response.json();
+  },
+
+  async createClient(data: CreateClientDTO): Promise<Client> {
+    const response = await fetch(`${API_BASE_URL}/clients`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) throw new Error('Failed to create client');
+    return response.json();
+  },
+
   async updateProject(id: string, data: UpdateProjectDTO): Promise<Project> {
     const response = await fetch(`${API_BASE_URL}/projects/${id}`, {
       method: 'PATCH',

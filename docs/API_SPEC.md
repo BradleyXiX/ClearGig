@@ -2,6 +2,13 @@
 
 ## Base URL: `/api/v1`
 
+### Clients
+*   **GET `/clients`**
+    *   Returns a list of all clients.
+*   **POST `/clients`**
+    *   Payload: `{ name, email }`
+    *   Creates a new client.
+
 ### Projects
 *   **GET `/projects`** 
     *   Returns a list of all estimates.
