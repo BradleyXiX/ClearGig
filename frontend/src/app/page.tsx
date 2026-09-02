@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Plus, LayoutDashboard } from 'lucide-react';
-import { api, Project } from '../services/api';
+import { api, Project, Client } from '../services/api';
 import ProjectCard from '../components/ProjectCard';
 
 export default function Home() {
@@ -11,10 +11,28 @@ export default function Home() {
   const [isCreating, setIsCreating] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newClientId, setNewClientId] = useState('');
+  
+  const [clients, setClients] = useState<Client[]>([]);
+  const [isCreatingClient, setIsCreatingClient] = useState(false);
+  const [newClientName, setNewClientName] = useState('');
+  const [newClientEmail, setNewClientEmail] = useState('');
 
   useEffect(() => {
     loadProjects();
+    loadClients();
   }, []);
+
+  const loadClients = async () => {
+    try {
+      const data = await api.getClients();
+      setClients(data);
+      if (data.length > 0 && !newClientId) {
+        setNewClientId(data[0].id);
+      }
+    } catch (error) {
+      console.error('Error loading clients:', error);
+    }
+  };
 
   const loadProjects = async () => {
     try {
@@ -44,6 +62,22 @@ export default function Home() {
       loadProjects();
     } catch (error) {
       console.error('Error creating project:', error);
+    }
+  };
+
+  const handleCreateClient = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newClientName) return;
+
+    try {
+      const newClient = await api.createClient({ name: newClientName, email: newClientEmail });
+      await loadClients();
+      setNewClientId(newClient.id);
+      setIsCreatingClient(false);
+      setNewClientName('');
+      setNewClientEmail('');
+    } catch (error) {
+      console.error('Error creating client:', error);
     }
   };
 
@@ -89,15 +123,50 @@ export default function Home() {
               />
             </div>
             <div className="flex-1">
-              <label className="block text-sm font-medium text-muted-foreground mb-1">Client ID</label>
-              <input
-                type="text"
-                value={newClientId}
-                onChange={(e) => setNewClientId(e.target.value)}
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                placeholder="Enter client UUID"
-                required
-              />
+              <label className="block text-sm font-medium text-muted-foreground mb-1 flex justify-between">
+                Client
+                <button type="button" onClick={() => setIsCreatingClient(!isCreatingClient)} className="text-primary text-xs hover:underline">
+                  {isCreatingClient ? 'Select Existing' : '+ New Client'}
+                </button>
+              </label>
+              {isCreatingClient ? (
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newClientName}
+                    onChange={(e) => setNewClientName(e.target.value)}
+                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    placeholder="Client Name"
+                  />
+                  <input
+                    type="email"
+                    value={newClientEmail}
+                    onChange={(e) => setNewClientEmail(e.target.value)}
+                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    placeholder="Email (optional)"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleCreateClient}
+                    disabled={!newClientName}
+                    className="px-3 py-2 rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80 whitespace-nowrap"
+                  >
+                    Save
+                  </button>
+                </div>
+              ) : (
+                <select
+                  value={newClientId}
+                  onChange={(e) => setNewClientId(e.target.value)}
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  required
+                >
+                  <option value="" disabled>Select a client...</option>
+                  {clients.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              )}
             </div>
             <div className="flex gap-2">
               <button
