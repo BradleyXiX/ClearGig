@@ -21,7 +21,7 @@ export default function ProjectCard({ project }: ProjectCardProps) {
 
   return (
     <Link href={`/projects/${project.id}`}>
-      <div className="group relative overflow-hidden rounded-xl border border-border bg-card p-6 shadow-sm transition-all hover:shadow-md hover:border-primary/50">
+      <div className="group relative overflow-hidden rounded-xl border border-border bg-card p-6 shadow-sm glass transition-all hover:shadow-xl hover:border-primary/50 hover:-translate-y-1 duration-300">
         <div className="flex items-start justify-between">
           <div>
             <h3 className="font-semibold text-lg text-foreground group-hover:text-primary transition-colors">

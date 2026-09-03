@@ -81,11 +81,19 @@ export default function Home() {
     }
   };
 
-  const totalValue = projects.reduce((total, p) => {
-    const base = p.lineItems?.reduce((sum, item) => sum + (Number(item.estimatedHours) * Number(item.hourlyRate)), 0) || 0;
+  const activeProjects = projects.filter(p => p.status !== 'REJECTED');
+  
+  const totalValue = activeProjects.reduce((total, p) => {
+    const base = p.lineItems?.filter(i => !i.isRecurring).reduce((sum, item) => sum + (Number(item.estimatedHours) * Number(item.hourlyRate)), 0) || 0;
     const contingency = base * (Number(p.contingencyPercentage) / 100);
     const profit = (base + contingency) * (Number(p.profitMargin) / 100);
     return total + base + contingency + profit;
+  }, 0);
+
+  const totalMRR = activeProjects.reduce((total, p) => {
+    const recurring = p.lineItems?.filter(i => i.isRecurring).reduce((sum, item) => sum + (Number(item.estimatedHours) * Number(item.hourlyRate)), 0) || 0;
+    const profit = recurring * (Number(p.profitMargin) / 100);
+    return total + recurring + profit;
   }, 0);
 
   return (
@@ -188,15 +196,21 @@ export default function Home() {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-        <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
+        <div className="bg-card border border-border rounded-xl p-6 shadow-sm glass hover:border-primary/50 transition-colors duration-300">
           <div className="text-muted-foreground text-sm font-medium mb-1">Total Pipeline Value</div>
           <div className="text-3xl font-bold text-foreground">
             {totalValue.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
           </div>
         </div>
-        <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
+        <div className="bg-card border border-border rounded-xl p-6 shadow-sm glass hover:border-emerald-500/50 transition-colors duration-300">
+          <div className="text-muted-foreground text-sm font-medium mb-1">Monthly Recurring</div>
+          <div className="text-3xl font-bold text-emerald-500">
+            {totalMRR.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
+          </div>
+        </div>
+        <div className="bg-card border border-border rounded-xl p-6 shadow-sm glass hover:border-blue-500/50 transition-colors duration-300">
           <div className="text-muted-foreground text-sm font-medium mb-1">Active Estimates</div>
-          <div className="text-3xl font-bold text-foreground">{projects.length}</div>
+          <div className="text-3xl font-bold text-foreground">{activeProjects.length}</div>
         </div>
       </div>
 

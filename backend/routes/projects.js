@@ -18,4 +18,7 @@ router.patch('/:id', projectController.updateProject);
 // Route can be handled in lineItems routes, but spec specifically lists POST /projects/:id/line-items
 router.post('/:id/line-items', projectController.addLineItemToProject);
 
+// DELETE /api/v1/projects/:id - Deletes a project
+router.delete('/:id', projectController.deleteProject);
+
 module.exports = router;

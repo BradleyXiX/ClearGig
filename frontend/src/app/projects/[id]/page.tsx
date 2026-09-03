@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Save, Plus } from 'lucide-react';
+import { ArrowLeft, Save, Plus, Trash2 } from 'lucide-react';
 import { api, Project, LineItem } from '../../../services/api';
 import LineItemTable from '../../../components/LineItemTable';
 import SummaryPanel from '../../../components/SummaryPanel';
@@ -95,6 +95,17 @@ export default function ProjectDetail() {
       loadProject();
     } catch (error) {
       console.error('Error deleting line item:', error);
+    }
+  };
+
+  const handleDeleteProject = async () => {
+    if (!window.confirm('Are you sure you want to delete this project? This action cannot be undone.')) return;
+    
+    try {
+      await api.deleteProject(id);
+      router.push('/');
+    } catch (error) {
+      console.error('Error deleting project:', error);
     }
   };
 
@@ -288,6 +299,16 @@ export default function ProjectDetail() {
                 />
               </div>
             </div>
+          </div>
+          
+          <div className="pt-4 border-t border-border mt-6">
+            <button
+              onClick={handleDeleteProject}
+              className="w-full bg-red-100 hover:bg-red-200 text-red-700 dark:bg-red-900/30 dark:hover:bg-red-900/50 dark:text-red-400 py-2.5 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 shadow-sm"
+            >
+              <Trash2 className="w-4 h-4" />
+              Delete Project
+            </button>
           </div>
         </div>
       </div>

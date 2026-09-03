@@ -109,3 +109,18 @@ exports.addLineItemToProject = async (req, res, next) => {
     next(error);
   }
 };
+
+exports.deleteProject = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    await prisma.project.delete({
+      where: { id },
+    });
+    res.status(204).end();
+  } catch (error) {
+    if (error.code === 'P2025') {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+    next(error);
+  }
+};
