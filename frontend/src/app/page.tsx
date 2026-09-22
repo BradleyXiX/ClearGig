@@ -17,11 +17,6 @@ export default function Home() {
   const [newClientName, setNewClientName] = useState('');
   const [newClientEmail, setNewClientEmail] = useState('');
 
-  useEffect(() => {
-    loadProjects();
-    loadClients();
-  }, []);
-
   const loadClients = async () => {
     try {
       const data = await api.getClients();
@@ -44,6 +39,12 @@ export default function Home() {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadProjects();
+    loadClients();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleCreateProject = async (e: React.FormEvent) => {
     e.preventDefault();

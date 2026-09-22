@@ -28,10 +28,6 @@ export default function ProjectDetail() {
   const [hourlyRate, setHourlyRate] = useState('');
   const [isRecurring, setIsRecurring] = useState(false);
 
-  useEffect(() => {
-    loadProject();
-  }, [id]);
-
   const loadProject = async () => {
     try {
       const data = await api.getProjectById(id);
@@ -45,6 +41,11 @@ export default function ProjectDetail() {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadProject();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
 
   const handleAddLineItem = async (e: React.FormEvent) => {
     e.preventDefault();
