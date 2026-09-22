@@ -41,7 +41,9 @@ export default function Home() {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadProjects();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadClients();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Save, Plus, Trash2 } from 'lucide-react';
-import { api, Project, LineItem } from '../../../services/api';
+import { api, Project } from '../../../services/api';
 import LineItemTable from '../../../components/LineItemTable';
 import SummaryPanel from '../../../components/SummaryPanel';
 
@@ -43,6 +43,7 @@ export default function ProjectDetail() {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadProject();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
