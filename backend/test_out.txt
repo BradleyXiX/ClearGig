@@ -1,0 +1,4 @@
+◇ injected env (2) from .env // tip: ⌁ auth for agents [www.vestauth.com]
+Test server running on port: 5002
+[2026-09-21T14:58:38.312Z] GET /api/v1/health
+[2026-09-21T14:58:38.397Z] GET /api/v1/projects
