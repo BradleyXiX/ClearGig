@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "npx prisma migrate deploy && node server.js",
+    "start": "prisma migrate deploy || echo 'Migration failed, starting server anyway...' ; node server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
