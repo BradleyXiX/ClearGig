@@ -1,5 +1,5 @@
 'use client';
-import { useRef, useMemo } from 'react';
+import { useRef, useState } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
@@ -7,11 +7,11 @@ function AmbientDataSea() {
   const meshRef = useRef<THREE.Mesh>(null);
   
   // Create a plane for our terrain
-  const geometry = useMemo(() => {
+  const [geometry] = useState(() => {
     const geo = new THREE.PlaneGeometry(100, 100, 40, 40);
     geo.rotateX(-Math.PI / 2); // Lay it flat
     return geo;
-  }, []);
+  });
 
   useFrame((state) => {
     if (!meshRef.current) return;

@@ -1,5 +1,5 @@
 'use client';
-import { useRef, useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
 
@@ -17,9 +17,14 @@ export default function Home() {
   const contingency = subtotal * 0.15; // 15% buffer
   const total = subtotal + contingency;
 
-  // Generate a fake invoice ID
-  const invoiceId = `EST-${new Date().getFullYear()}-${Math.floor(Math.random() * 9000) + 1000}`;
-  const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  // Generate a fake invoice ID (client-side only to avoid hydration mismatch)
+  const [invoiceId, setInvoiceId] = useState<string>('');
+  const [date, setDate] = useState<string>('');
+
+  useEffect(() => {
+    setInvoiceId(`EST-${new Date().getFullYear()}-${Math.floor(Math.random() * 9000) + 1000}`);
+    setDate(new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }));
+  }, []);
 
   useGSAP(() => {
     gsap.to('.scanner-line', {
