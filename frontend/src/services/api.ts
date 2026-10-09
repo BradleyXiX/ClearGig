@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:5001/api/v1';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api/v1';
 
 export interface Client {
   id: string;
@@ -57,135 +57,72 @@ export interface UpdateProjectDTO {
   profit_margin?: number;
 }
 
-// MOCK DATA SETUP
-const mockClients: Client[] = [
-  { id: 'c1', name: 'Acme Corp', email: 'hello@acme.co', createdAt: new Date().toISOString() },
-  { id: 'c2', name: 'Vercel Inc.', email: 'billing@vercel.com', createdAt: new Date().toISOString() },
-];
-
-const mockProjects: Project[] = [
-  {
-    id: 'p1',
-    clientId: 'c1',
-    title: 'E-commerce Overhaul',
-    status: 'DRAFT',
-    contingencyPercentage: 15,
-    profitMargin: 20,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    client: mockClients[0],
-    lineItems: [
-      { id: 'l1', projectId: 'p1', category: 'FRONTEND', description: 'Next.js App Router Setup', estimatedHours: 40, hourlyRate: 150, isRecurring: false },
-      { id: 'l2', projectId: 'p1', category: 'BACKEND', description: 'Stripe Integration', estimatedHours: 25, hourlyRate: 150, isRecurring: false },
-      { id: 'l3', projectId: 'p1', category: 'MAINTENANCE', description: 'Monthly Retainer', estimatedHours: 10, hourlyRate: 100, isRecurring: true },
-    ]
-  },
-  {
-    id: 'p2',
-    clientId: 'c2',
-    title: 'Marketing Site 3D',
-    status: 'ACCEPTED',
-    contingencyPercentage: 10,
-    profitMargin: 30,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    client: mockClients[1],
-    lineItems: [
-      { id: 'l4', projectId: 'p2', category: 'FRONTEND', description: 'Three.js Hero Section', estimatedHours: 60, hourlyRate: 200, isRecurring: false },
-    ]
+// Global fetch helper
+async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> {
+  const res = await fetch(`${API_BASE_URL}${endpoint}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options?.headers,
+    },
+  });
+  if (!res.ok) {
+    const error = await res.text();
+    throw new Error(`API Error ${res.status}: ${error}`);
   }
-];
-
-// DELAY HELPER
-const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
+  return res.json();
+}
 
 export const api = {
   async getClients(): Promise<Client[]> {
-    await delay(500);
-    return [...mockClients];
+    return fetchAPI<Client[]>('/clients');
   },
 
   async createClient(data: CreateClientDTO): Promise<Client> {
-    await delay(300);
-    const newClient: Client = {
-      id: `c${Date.now()}`,
-      name: data.name,
-      email: data.email,
-      createdAt: new Date().toISOString()
-    };
-    mockClients.push(newClient);
-    return newClient;
+    return fetchAPI<Client>('/clients', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
   },
 
   async updateProject(id: string, data: UpdateProjectDTO): Promise<Project> {
-    await delay(300);
-    const p = mockProjects.find(p => p.id === id);
-    if (!p) throw new Error('Not found');
-    Object.assign(p, data);
-    return p;
+    return fetchAPI<Project>(`/projects/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
   },
 
   async getProjects(): Promise<Project[]> {
-    await delay(800);
-    return [...mockProjects];
+    return fetchAPI<Project[]>('/projects');
   },
 
   async getProjectById(id: string): Promise<Project> {
-    await delay(400);
-    const p = mockProjects.find(p => p.id === id);
-    if (!p) throw new Error('Not found');
-    return p;
+    return fetchAPI<Project>(`/projects/${id}`);
   },
 
   async createProject(data: CreateProjectDTO): Promise<Project> {
-    await delay(500);
-    const newProject: Project = {
-      id: `p${Date.now()}`,
-      clientId: data.client_id,
-      title: data.title,
-      status: 'DRAFT',
-      contingencyPercentage: data.contingency_percentage || 10,
-      profitMargin: data.profit_margin || 20,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      client: mockClients.find(c => c.id === data.client_id),
-      lineItems: []
-    };
-    mockProjects.push(newProject);
-    return newProject;
+    return fetchAPI<Project>('/projects', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
   },
 
   async addLineItem(projectId: string, data: CreateLineItemDTO): Promise<LineItem> {
-    await delay(300);
-    const p = mockProjects.find(p => p.id === projectId);
-    if (!p) throw new Error('Not found');
-    const li: LineItem = {
-      id: `l${Date.now()}`,
-      projectId,
-      category: data.category as any,
-      description: data.description,
-      estimatedHours: data.estimated_hours,
-      hourlyRate: data.hourly_rate,
-      isRecurring: data.is_recurring || false
-    };
-    if (!p.lineItems) p.lineItems = [];
-    p.lineItems.push(li);
-    return li;
+    return fetchAPI<LineItem>(`/projects/${projectId}/line-items`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
   },
 
   async deleteLineItem(id: string): Promise<{ message: string }> {
-    await delay(200);
-    mockProjects.forEach(p => {
-      if (p.lineItems) {
-        p.lineItems = p.lineItems.filter(li => li.id !== id);
-      }
+    return fetchAPI<{ message: string }>(`/line-items/${id}`, {
+      method: 'DELETE',
     });
-    return { message: 'Deleted' };
   },
 
   async deleteProject(id: string): Promise<void> {
-    await delay(300);
-    const index = mockProjects.findIndex(p => p.id === id);
-    if (index > -1) mockProjects.splice(index, 1);
+    return fetchAPI<void>(`/projects/${id}`, {
+      method: 'DELETE',
+    });
   }
 };
