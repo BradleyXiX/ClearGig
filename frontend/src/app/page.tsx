@@ -162,7 +162,7 @@ export default function Home() {
           
           {step === 5 && (
             <div className="absolute top-8 left-1/2 -translate-x-1/2 flex gap-4 pointer-events-auto">
-               <button onClick={() => setStep(0)} className="px-6 py-2 bg-secondary text-foreground text-xs font-bold uppercase tracking-widest rounded-full hover:bg-white hover:text-black transition-colors cursor-none">Start Over</button>
+               <button onClick={() => { setStep(0); setClient(''); setTitle(''); setFrontend(''); setBackend(''); }} className="px-6 py-2 bg-secondary text-foreground text-xs font-bold uppercase tracking-widest rounded-full hover:bg-white hover:text-black transition-colors cursor-none">Start Over</button>
                <button className="px-6 py-2 bg-primary text-black text-xs font-bold uppercase tracking-widest rounded-full hover:scale-105 transition-transform cursor-none shadow-[0_0_15px_rgba(212,255,0,0.4)]">Export PDF</button>
             </div>
           )}
