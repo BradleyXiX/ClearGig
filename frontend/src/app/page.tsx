@@ -1,284 +1,268 @@
 'use client';
-
-import { useEffect, useState, useRef } from 'react';
-import { Plus, LayoutDashboard } from 'lucide-react';
-import { api, Project, Client } from '../services/api';
-import ProjectCard from '../components/ProjectCard';
+import { useRef, useState, useEffect } from 'react';
 import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
-
-gsap.registerPlugin(ScrollTrigger);
 
 export default function Home() {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const summaryRef = useRef<HTMLDivElement>(null);
-  const cardsRef = useRef<HTMLDivElement>(null);
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isCreating, setIsCreating] = useState(false);
-  const [newTitle, setNewTitle] = useState('');
-  const [newClientId, setNewClientId] = useState('');
+  const [step, setStep] = useState(0);
+  const [client, setClient] = useState('');
+  const [title, setTitle] = useState('');
+  const [frontend, setFrontend] = useState('');
+  const [backend, setBackend] = useState('');
   
-  const [clients, setClients] = useState<Client[]>([]);
-  const [isCreatingClient, setIsCreatingClient] = useState(false);
-  const [newClientName, setNewClientName] = useState('');
-  const [newClientEmail, setNewClientEmail] = useState('');
+  // Professional calculation breakdown
+  const frontendCost = Number(frontend) * 150;
+  const backendCost = Number(backend) * 150;
+  const subtotal = frontendCost + backendCost;
+  const contingency = subtotal * 0.15; // 15% buffer
+  const total = subtotal + contingency;
 
-  const loadClients = async () => {
-    try {
-      const data = await api.getClients();
-      setClients(data);
-      if (data.length > 0 && !newClientId) {
-        setNewClientId(data[0].id);
-      }
-    } catch (error) {
-      console.error('Error loading clients:', error);
-    }
-  };
-
-  const loadProjects = async () => {
-    try {
-      const data = await api.getProjects();
-      setProjects(data);
-    } catch (error) {
-      console.error('Error loading projects:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadProjects();
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadClients();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Generate a fake invoice ID
+  const invoiceId = `EST-${new Date().getFullYear()}-${Math.floor(Math.random() * 9000) + 1000}`;
+  const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
   useGSAP(() => {
-    if (isLoading || projects.length === 0) return;
-
-    // Pinned Summary Section
-    ScrollTrigger.create({
-      trigger: summaryRef.current,
-      start: 'top 20px',
-      endTrigger: cardsRef.current,
-      end: 'bottom bottom',
-      pin: true,
-      pinSpacing: false,
+    gsap.to('.scanner-line', {
+      y: '90vh',
+      duration: 3,
+      repeat: -1,
+      yoyo: true,
+      ease: 'sine.inOut'
     });
+  }, []);
 
-    // Stagger reveal project cards
-    gsap.fromTo(
-      '.project-card-anim',
-      { y: 50, opacity: 0 },
-      {
-        y: 0,
-        opacity: 1,
-        duration: 0.8,
-        stagger: 0.1,
-        ease: 'power3.out',
-        scrollTrigger: {
-          trigger: cardsRef.current,
-          start: 'top 80%',
-        }
-      }
-    );
-  }, { dependencies: [isLoading, projects.length], scope: containerRef });
+  useEffect(() => {
+    document.body.style.overflow = step === 5 ? 'auto' : 'hidden'; // Allow scrolling ONLY on the final report
+    return () => { document.body.style.overflow = 'auto'; };
+  }, [step]);
 
-  const handleCreateProject = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newTitle || !newClientId) return;
-
-    try {
-      await api.createProject({
-        title: newTitle,
-        client_id: newClientId,
-        contingency_percentage: 10, // Default 10%
-        profit_margin: 20 // Default 20%
-      });
-      setNewTitle('');
-      setNewClientId('');
-      setIsCreating(false);
-      loadProjects();
-    } catch (error) {
-      console.error('Error creating project:', error);
-    }
+  const handleNext = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (step < 5) setStep(step + 1);
   };
 
-  const handleCreateClient = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newClientName) return;
-
-    try {
-      const newClient = await api.createClient({ name: newClientName, email: newClientEmail });
-      await loadClients();
-      setNewClientId(newClient.id);
-      setIsCreatingClient(false);
-      setNewClientName('');
-      setNewClientEmail('');
-    } catch (error) {
-      console.error('Error creating client:', error);
-    }
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') handleNext();
   };
 
-  const activeProjects = projects.filter(p => p.status !== 'REJECTED');
-  
-  const totalValue = activeProjects.reduce((total, p) => {
-    const base = p.lineItems?.filter(i => !i.isRecurring).reduce((sum, item) => sum + (Number(item.estimatedHours) * Number(item.hourlyRate)), 0) || 0;
-    const contingency = base * (Number(p.contingencyPercentage) / 100);
-    const profit = (base + contingency) * (Number(p.profitMargin) / 100);
-    return total + base + contingency + profit;
-  }, 0);
-
-  const totalMRR = activeProjects.reduce((total, p) => {
-    const recurring = p.lineItems?.filter(i => i.isRecurring).reduce((sum, item) => sum + (Number(item.estimatedHours) * Number(item.hourlyRate)), 0) || 0;
-    const profit = recurring * (Number(p.profitMargin) / 100);
-    return total + recurring + profit;
-  }, 0);
+  const getStepClasses = (index: number) => {
+    if (step === 5) return 'opacity-0 scale-[4] blur-3xl z-0 pointer-events-none translate-y-[-20%]'; // Hide all steps on final report
+    if (step === index) return 'opacity-100 scale-100 blur-none z-20 pointer-events-auto';
+    if (step > index) return 'opacity-0 scale-[4] blur-3xl z-0 pointer-events-none translate-y-[-20%]'; 
+    return 'opacity-0 scale-50 blur-xl z-0 pointer-events-none translate-y-[20%]'; 
+  };
 
   return (
-    <div className="min-h-screen p-8 max-w-7xl mx-auto" ref={containerRef}>
-      <header className="flex justify-between items-center mb-12">
-        <div className="flex items-center gap-3">
-          <div className="bg-primary p-2 rounded-lg text-primary-foreground shadow-sm">
-            <LayoutDashboard className="w-6 h-6" />
+    <div className={`relative w-full ${step === 5 ? 'min-h-screen overflow-auto' : 'h-screen overflow-hidden'} text-foreground transition-colors duration-[850ms]`}>
+      
+      {/* Right Panel: The Blueprint (Expands to Full Screen on Step 5) */}
+      <div className={`absolute top-0 right-0 z-10 pointer-events-none transition-all duration-[850ms] ease-[cubic-bezier(0.23,1,0.32,1)] ${step === 5 ? 'w-full min-h-screen p-4 md:p-12 relative' : 'w-full md:w-1/2 h-screen p-8 md:p-12'}`}>
+        <div className={`w-full glass rounded-3xl p-8 flex flex-col font-mono relative pointer-events-auto transition-all duration-[850ms] ${step === 5 ? 'min-h-[90vh] bg-card/80 backdrop-blur-3xl border-primary/30 shadow-[0_0_80px_rgba(212,255,0,0.1)]' : 'h-full justify-between'}`}>
+          
+          {step !== 5 && <div className="scanner-line absolute top-0 left-0 w-full h-[2px] bg-primary/80 shadow-[0_0_30px_#D4FF00] z-50 pointer-events-none" />}
+          
+          {/* Header */}
+          <div className={`flex justify-between items-start transition-all duration-[850ms] ${step === 5 ? 'mb-20' : 'mb-12'}`}>
+            <h2 className="text-primary text-xs tracking-[0.3em] uppercase flex items-center gap-4">
+              <span className={`w-2 h-2 bg-primary rounded-full ${step === 5 ? '' : 'animate-pulse'}`} />
+              {step === 5 ? 'Official Estimate Statement' : 'Project Blueprint'}
+            </h2>
+            {step === 5 && (
+              <div className="text-right">
+                <div className="text-foreground text-sm font-bold tracking-widest">{invoiceId}</div>
+                <div className="text-muted-foreground text-xs uppercase tracking-widest mt-1">{date}</div>
+              </div>
+            )}
           </div>
-          <h1 className="text-3xl font-bold tracking-tight">ClearGig</h1>
-        </div>
-        
-        <button
-          onClick={() => setIsCreating(true)}
-          className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 shadow-sm"
-        >
-          <Plus className="w-5 h-5" />
-          New Estimate
-        </button>
-      </header>
+          
+          {/* Main Content Area */}
+          <div className={`transition-all duration-[850ms] ${step === 5 ? 'flex-1 grid grid-cols-1 md:grid-cols-2 gap-16' : 'space-y-8 text-sm md:text-base'}`}>
+            
+            {/* Left Column in Report / Main List in Blueprint */}
+            <div className="space-y-8">
+              <div className="border-b border-border/50 pb-4">
+                <div className="text-muted-foreground uppercase tracking-widest text-xs mb-2">Client Entity</div>
+                <div className={`text-foreground font-bold transition-all duration-[850ms] ${step === 5 ? 'text-4xl' : ''}`}>{client || '---'}</div>
+              </div>
+              
+              <div className="border-b border-border/50 pb-4">
+                <div className="text-muted-foreground uppercase tracking-widest text-xs mb-2">Directive</div>
+                <div className={`text-foreground font-bold transition-all duration-[850ms] ${step === 5 ? 'text-3xl text-primary' : ''}`}>{title || '---'}</div>
+              </div>
 
-      {isCreating && (
-        <div className="mb-8 p-6 bg-card border border-border rounded-xl shadow-sm glass">
-          <h2 className="text-lg font-semibold mb-4 text-foreground">Create New Estimate</h2>
-          <form onSubmit={handleCreateProject} className="flex gap-4 items-end">
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-muted-foreground mb-1">Project Title</label>
-              <input
-                type="text"
-                value={newTitle}
-                onChange={(e) => setNewTitle(e.target.value)}
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                placeholder="e.g., E-commerce Redesign"
-                required
-              />
-            </div>
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-muted-foreground mb-1 flex justify-between">
-                Client
-                <button type="button" onClick={() => setIsCreatingClient(!isCreatingClient)} className="text-primary text-xs hover:underline">
-                  {isCreatingClient ? 'Select Existing' : '+ New Client'}
-                </button>
-              </label>
-              {isCreatingClient ? (
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={newClientName}
-                    onChange={(e) => setNewClientName(e.target.value)}
-                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                    placeholder="Client Name"
-                  />
-                  <input
-                    type="email"
-                    value={newClientEmail}
-                    onChange={(e) => setNewClientEmail(e.target.value)}
-                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                    placeholder="Email (optional)"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleCreateClient}
-                    disabled={!newClientName}
-                    className="px-3 py-2 rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80 whitespace-nowrap"
-                  >
-                    Save
-                  </button>
+              {step === 5 && (
+                <div className="pt-8 space-y-4 text-xs text-muted-foreground max-w-sm leading-relaxed">
+                  <p>This estimate outlines the architectural and engineering scope required to execute the above directive.</p>
+                  <p>All intellectual property transfers upon final payment. Estimate valid for 30 days.</p>
                 </div>
-              ) : (
-                <select
-                  value={newClientId}
-                  onChange={(e) => setNewClientId(e.target.value)}
-                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                  required
-                >
-                  <option value="" disabled>Select a client...</option>
-                  {clients.map(c => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
               )}
             </div>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setIsCreating(false)}
-                className="px-4 py-2 rounded-md border border-border text-foreground hover:bg-secondary transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="px-4 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-              >
-                Create
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12 relative z-10" ref={summaryRef}>
-        <div className="bg-card border border-border rounded-xl p-6 shadow-sm glass hover:border-primary/50 transition-colors duration-300">
-          <div className="text-muted-foreground text-sm font-medium mb-1">Total Pipeline Value</div>
-          <div className="text-3xl font-bold text-foreground">
-            {totalValue.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
+            {/* Right Column in Report (Financial Breakdown) / Hidden in Blueprint */}
+            <div className={`space-y-6 ${step === 5 ? 'block' : 'hidden'}`}>
+              <div className="text-primary uppercase tracking-widest text-xs mb-8 border-b border-primary/30 pb-4">Scope & Logistics</div>
+              
+              <div className="flex justify-between items-end border-b border-border/30 pb-4">
+                <div>
+                  <div className="text-foreground font-bold">Frontend Engineering</div>
+                  <div className="text-muted-foreground text-xs mt-1">{frontend || 0} hrs @ $150/hr</div>
+                </div>
+                <div className="text-foreground font-mono">${frontendCost.toLocaleString()}</div>
+              </div>
+
+              <div className="flex justify-between items-end border-b border-border/30 pb-4">
+                <div>
+                  <div className="text-foreground font-bold">Backend Engineering</div>
+                  <div className="text-muted-foreground text-xs mt-1">{backend || 0} hrs @ $150/hr</div>
+                </div>
+                <div className="text-foreground font-mono">${backendCost.toLocaleString()}</div>
+              </div>
+
+              <div className="flex justify-between items-end border-b border-border/30 pb-4">
+                <div>
+                  <div className="text-foreground font-bold">Contingency Buffer</div>
+                  <div className="text-muted-foreground text-xs mt-1">15% Risk & Scope Creep</div>
+                </div>
+                <div className="text-foreground font-mono">${contingency.toLocaleString()}</div>
+              </div>
+            </div>
+
+            {/* Compact Scope for Blueprint View */}
+            {step !== 5 && (
+              <>
+                <div className="flex justify-between border-b border-border/50 pb-4 transition-colors duration-[850ms]" style={{ borderColor: step > 2 ? 'rgba(212,255,0,0.5)' : '' }}>
+                  <span className="text-muted-foreground uppercase tracking-widest text-xs">Frontend Scope</span>
+                  <span className="text-foreground font-bold">{frontend ? `${frontend} hrs` : '---'}</span>
+                </div>
+                <div className="flex justify-between border-b border-border/50 pb-4 transition-colors duration-[850ms]" style={{ borderColor: step > 3 ? 'rgba(212,255,0,0.5)' : '' }}>
+                  <span className="text-muted-foreground uppercase tracking-widest text-xs">Backend Scope</span>
+                  <span className="text-foreground font-bold">{backend ? `${backend} hrs` : '---'}</span>
+                </div>
+              </>
+            )}
           </div>
-        </div>
-        <div className="bg-card border border-border rounded-xl p-6 shadow-sm glass hover:border-emerald-500/50 transition-colors duration-300">
-          <div className="text-muted-foreground text-sm font-medium mb-1">Monthly Recurring</div>
-          <div className="text-3xl font-bold text-emerald-500">
-            {totalMRR.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
+          
+          {/* Footer Area */}
+          <div className={`mt-auto border-t border-primary/30 pt-6 transition-all duration-[850ms] ${step === 5 ? 'mt-16 flex flex-col md:flex-row justify-between items-end' : ''}`}>
+            
+            {step === 5 && (
+              <div className="mb-8 md:mb-0 space-y-4">
+                <div className="w-48 border-b-2 border-foreground/20 pb-2"></div>
+                <div className="text-muted-foreground text-xs uppercase tracking-widest">Authorized Signature</div>
+              </div>
+            )}
+
+            <div className={`flex ${step === 5 ? 'flex-col items-end gap-2' : 'justify-between items-end'}`}>
+              <span className="text-muted-foreground uppercase tracking-widest text-xs">Final Estimated Total</span>
+              <span className={`text-primary font-bold tracking-tighter transition-all duration-[850ms] ${step === 5 ? 'text-7xl' : 'text-5xl'}`}>
+                ${total.toLocaleString()}
+              </span>
+            </div>
           </div>
-        </div>
-        <div className="bg-card border border-border rounded-xl p-6 shadow-sm glass hover:border-blue-500/50 transition-colors duration-300">
-          <div className="text-muted-foreground text-sm font-medium mb-1">Active Estimates</div>
-          <div className="text-3xl font-bold text-foreground">{activeProjects.length}</div>
+          
+          {step === 5 && (
+            <div className="absolute top-8 left-1/2 -translate-x-1/2 flex gap-4 pointer-events-auto">
+               <button onClick={() => { setStep(0); setClient(''); setTitle(''); setFrontend(''); setBackend(''); }} className="px-6 py-2 bg-secondary text-foreground text-xs font-bold uppercase tracking-widest rounded-full hover:bg-white hover:text-black transition-colors cursor-none">Start Over</button>
+               <button className="px-6 py-2 bg-primary text-black text-xs font-bold uppercase tracking-widest rounded-full hover:scale-105 transition-transform cursor-none shadow-[0_0_15px_rgba(212,255,0,0.4)]">Export PDF</button>
+            </div>
+          )}
+
         </div>
       </div>
 
-      <div className="space-y-6 relative z-0 mt-8" ref={cardsRef}>
-        <h2 className="text-xl font-semibold text-foreground border-b border-border pb-2">Recent Estimates</h2>
+      {/* Left Panel: The Interactive Steps (Hidden on Step 5) */}
+      <div className={`w-full md:w-1/2 h-full relative z-20 ${step === 5 ? 'pointer-events-none' : ''}`}>
         
-        {isLoading ? (
-          <div className="animate-pulse flex space-x-4">
-            <div className="flex-1 space-y-4 py-1">
-              <div className="h-24 bg-secondary rounded-xl"></div>
-              <div className="h-24 bg-secondary rounded-xl"></div>
-            </div>
+        <div className={`absolute inset-0 flex flex-col justify-center px-8 md:px-16 transition-all duration-[850ms] ease-[cubic-bezier(0.23,1,0.32,1)] ${getStepClasses(0)}`}>
+          <h1 className="text-5xl md:text-7xl lg:text-8xl font-bold tracking-tighter leading-tight mb-8">
+            Who are we <br/><span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-emerald-500">working with?</span>
+          </h1>
+          <input 
+            type="text" 
+            placeholder="Type client name..." 
+            value={client}
+            onChange={e => setClient(e.target.value)}
+            onKeyDown={handleKeyDown}
+            className="text-2xl md:text-4xl bg-transparent border-b-2 border-border focus:border-primary focus:outline-none py-4 w-full md:w-3/4 transition-colors font-mono"
+            autoFocus
+          />
+          <button onClick={handleNext} className="mt-12 self-start uppercase tracking-widest text-xs text-primary font-bold hover:scale-110 transition-transform cursor-none flex items-center gap-2">
+            Press Enter <span className="text-lg">→</span>
+          </button>
+        </div>
+
+        <div className={`absolute inset-0 flex flex-col justify-center px-8 md:px-16 transition-all duration-[850ms] ease-[cubic-bezier(0.23,1,0.32,1)] ${getStepClasses(1)}`}>
+          <h1 className="text-5xl md:text-7xl lg:text-8xl font-bold tracking-tighter leading-tight mb-8">
+            What is the <br/><span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-emerald-500">directive?</span>
+          </h1>
+          <input 
+            type="text" 
+            placeholder="E-commerce Redesign..." 
+            value={title}
+            onChange={e => setTitle(e.target.value)}
+            onKeyDown={handleKeyDown}
+            className="text-2xl md:text-4xl bg-transparent border-b-2 border-border focus:border-primary focus:outline-none py-4 w-full md:w-3/4 transition-colors font-mono"
+          />
+          <div className="mt-12 flex gap-8">
+            <button onClick={() => setStep(0)} className="uppercase tracking-widest text-xs text-muted-foreground hover:text-foreground transition-colors cursor-none">← Back</button>
+            <button onClick={handleNext} className="uppercase tracking-widest text-xs text-primary font-bold hover:scale-110 transition-transform cursor-none flex items-center gap-2">Press Enter <span className="text-lg">→</span></button>
           </div>
-        ) : projects.length === 0 ? (
-          <div className="text-center py-12 text-muted-foreground bg-secondary/30 rounded-xl border border-dashed border-border">
-            No estimates found. Create one to get started!
+        </div>
+
+        <div className={`absolute inset-0 flex flex-col justify-center px-8 md:px-16 transition-all duration-[850ms] ease-[cubic-bezier(0.23,1,0.32,1)] ${getStepClasses(2)}`}>
+          <h1 className="text-5xl md:text-7xl font-bold tracking-tighter leading-tight mb-8">
+            Define the <br/><span className="text-primary">Frontend</span> scope.
+          </h1>
+          <div className="flex items-end gap-4 w-full md:w-3/4">
+            <input 
+              type="number" 
+              placeholder="0" 
+              value={frontend}
+              onChange={e => setFrontend(e.target.value)}
+              onKeyDown={handleKeyDown}
+              className="text-4xl md:text-6xl bg-transparent border-b-2 border-border focus:border-primary focus:outline-none py-4 w-32 transition-colors font-mono"
+            />
+            <span className="text-2xl md:text-3xl text-muted-foreground mb-4 font-mono">hours</span>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {projects.map(project => (
-              <div key={project.id} className="project-card-anim opacity-0">
-                <ProjectCard project={project} />
-              </div>
-            ))}
+          <div className="mt-12 flex gap-8">
+            <button onClick={() => setStep(1)} className="uppercase tracking-widest text-xs text-muted-foreground hover:text-foreground transition-colors cursor-none">← Back</button>
+            <button onClick={handleNext} className="uppercase tracking-widest text-xs text-primary font-bold hover:scale-110 transition-transform cursor-none flex items-center gap-2">Press Enter <span className="text-lg">→</span></button>
           </div>
-        )}
+        </div>
+
+        <div className={`absolute inset-0 flex flex-col justify-center px-8 md:px-16 transition-all duration-[850ms] ease-[cubic-bezier(0.23,1,0.32,1)] ${getStepClasses(3)}`}>
+          <h1 className="text-5xl md:text-7xl font-bold tracking-tighter leading-tight mb-8">
+            Define the <br/><span className="text-primary">Backend</span> scope.
+          </h1>
+          <div className="flex items-end gap-4 w-full md:w-3/4">
+            <input 
+              type="number" 
+              placeholder="0" 
+              value={backend}
+              onChange={e => setBackend(e.target.value)}
+              onKeyDown={handleKeyDown}
+              className="text-4xl md:text-6xl bg-transparent border-b-2 border-border focus:border-primary focus:outline-none py-4 w-32 transition-colors font-mono"
+            />
+            <span className="text-2xl md:text-3xl text-muted-foreground mb-4 font-mono">hours</span>
+          </div>
+          <div className="mt-12 flex gap-8">
+            <button onClick={() => setStep(2)} className="uppercase tracking-widest text-xs text-muted-foreground hover:text-foreground transition-colors cursor-none">← Back</button>
+            <button onClick={handleNext} className="uppercase tracking-widest text-xs text-primary font-bold hover:scale-110 transition-transform cursor-none flex items-center gap-2">Press Enter <span className="text-lg">→</span></button>
+          </div>
+        </div>
+
+        <div className={`absolute inset-0 flex flex-col justify-center px-8 md:px-16 transition-all duration-[850ms] ease-[cubic-bezier(0.23,1,0.32,1)] ${getStepClasses(4)}`}>
+          <h1 className="text-6xl md:text-8xl font-bold tracking-tighter leading-tight mb-12">
+            Blueprint <br/><span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-emerald-500">Assembled.</span>
+          </h1>
+          <button onClick={handleNext} className="bg-primary text-primary-foreground font-bold text-xl md:text-2xl px-12 py-6 rounded-full hover:scale-105 transition-transform duration-[850ms] shadow-[0_0_40px_rgba(212,255,0,0.4)] cursor-none self-start">
+            Generate Proposal
+          </button>
+          <button onClick={() => setStep(3)} className="mt-8 self-start uppercase tracking-widest text-xs text-muted-foreground hover:text-foreground transition-colors cursor-none">
+            ← Edit Scope
+          </button>
+        </div>
+
       </div>
     </div>
   );
