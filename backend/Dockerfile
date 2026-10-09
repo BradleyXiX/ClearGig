@@ -8,6 +8,7 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 # We need to copy prisma directory to run prisma generate
 COPY prisma ./prisma/
+COPY prisma.config.ts ./
 
 RUN npm ci
 RUN npx prisma generate
@@ -27,13 +28,14 @@ ENV NODE_ENV production
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 expressjs
 
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/server.js ./server.js
-COPY --from=builder /app/routes ./routes
-COPY --from=builder /app/controllers ./controllers
-COPY --from=builder /app/prismaClient.js ./prismaClient.js
+COPY --from=builder --chown=expressjs:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=expressjs:nodejs /app/package.json ./package.json
+COPY --from=builder --chown=expressjs:nodejs /app/prisma ./prisma
+COPY --from=builder --chown=expressjs:nodejs /app/server.js ./server.js
+COPY --from=builder --chown=expressjs:nodejs /app/routes ./routes
+COPY --from=builder --chown=expressjs:nodejs /app/controllers ./controllers
+COPY --from=builder --chown=expressjs:nodejs /app/prismaClient.js ./prismaClient.js
+COPY --from=builder --chown=expressjs:nodejs /app/prisma.config.ts ./prisma.config.ts
 
 USER expressjs
 
