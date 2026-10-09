@@ -1,11 +1,19 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Plus, LayoutDashboard } from 'lucide-react';
 import { api, Project, Client } from '../services/api';
 import ProjectCard from '../components/ProjectCard';
+import gsap from 'gsap';
+import { useGSAP } from '@gsap/react';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
+
+gsap.registerPlugin(ScrollTrigger);
 
 export default function Home() {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const summaryRef = useRef<HTMLDivElement>(null);
+  const cardsRef = useRef<HTMLDivElement>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
@@ -47,6 +55,37 @@ export default function Home() {
     loadClients();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useGSAP(() => {
+    if (isLoading || projects.length === 0) return;
+
+    // Pinned Summary Section
+    ScrollTrigger.create({
+      trigger: summaryRef.current,
+      start: 'top 20px',
+      endTrigger: cardsRef.current,
+      end: 'bottom bottom',
+      pin: true,
+      pinSpacing: false,
+    });
+
+    // Stagger reveal project cards
+    gsap.fromTo(
+      '.project-card-anim',
+      { y: 50, opacity: 0 },
+      {
+        y: 0,
+        opacity: 1,
+        duration: 0.8,
+        stagger: 0.1,
+        ease: 'power3.out',
+        scrollTrigger: {
+          trigger: cardsRef.current,
+          start: 'top 80%',
+        }
+      }
+    );
+  }, { dependencies: [isLoading, projects.length], scope: containerRef });
 
   const handleCreateProject = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,7 +139,7 @@ export default function Home() {
   }, 0);
 
   return (
-    <div className="min-h-screen p-8 max-w-7xl mx-auto">
+    <div className="min-h-screen p-8 max-w-7xl mx-auto" ref={containerRef}>
       <header className="flex justify-between items-center mb-12">
         <div className="flex items-center gap-3">
           <div className="bg-primary p-2 rounded-lg text-primary-foreground shadow-sm">
@@ -198,7 +237,7 @@ export default function Home() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12 relative z-10" ref={summaryRef}>
         <div className="bg-card border border-border rounded-xl p-6 shadow-sm glass hover:border-primary/50 transition-colors duration-300">
           <div className="text-muted-foreground text-sm font-medium mb-1">Total Pipeline Value</div>
           <div className="text-3xl font-bold text-foreground">
@@ -217,7 +256,7 @@ export default function Home() {
         </div>
       </div>
 
-      <div className="space-y-6">
+      <div className="space-y-6 relative z-0 mt-8" ref={cardsRef}>
         <h2 className="text-xl font-semibold text-foreground border-b border-border pb-2">Recent Estimates</h2>
         
         {isLoading ? (
@@ -234,7 +273,9 @@ export default function Home() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {projects.map(project => (
-              <ProjectCard key={project.id} project={project} />
+              <div key={project.id} className="project-card-anim opacity-0">
+                <ProjectCard project={project} />
+              </div>
             ))}
           </div>
         )}
