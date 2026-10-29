@@ -7,7 +7,7 @@ const lineItemRoutes = require('./routes/lineItems');
 const clientRoutes = require('./routes/clients');
 
 const app = express();
-const port = process.env.PORT || 5000;
+const port = process.env.PORT || 5001;
 
 // Middleware
 const corsOptions = {

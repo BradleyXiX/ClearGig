@@ -1,12 +1,17 @@
 const express = require('express');
 const router = express.Router();
 const projectController = require('../controllers/projectController');
+const {
+  createProjectSchema,
+  createLineItemSchema,
+  validateBody,
+} = require('../middleware/validate');
 
 // GET /api/v1/projects - Returns a list of all estimates (projects)
 router.get('/', projectController.getAllProjects);
 
 // POST /api/v1/projects - Creates a new project wrapper
-router.post('/', projectController.createProject);
+router.post('/', validateBody(createProjectSchema), projectController.createProject);
 
 // GET /api/v1/projects/:id - Returns project details, including joined line_items
 router.get('/:id', projectController.getProjectById);
@@ -16,7 +21,7 @@ router.patch('/:id', projectController.updateProject);
 
 // POST /api/v1/projects/:id/line-items - Adds a cost item to a specific project
 // Route can be handled in lineItems routes, but spec specifically lists POST /projects/:id/line-items
-router.post('/:id/line-items', projectController.addLineItemToProject);
+router.post('/:id/line-items', validateBody(createLineItemSchema), projectController.addLineItemToProject);
 
 // DELETE /api/v1/projects/:id - Deletes a project
 router.delete('/:id', projectController.deleteProject);
