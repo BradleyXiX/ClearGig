@@ -267,6 +267,8 @@ export default function ProjectDetail() {
             recurringCost={recurringCost}
             contingencyPercentage={contingencyPercentage}
             profitMargin={profitMargin}
+            projectTitle={project.title}
+            clientName={project.client?.name}
           />
 
           <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
