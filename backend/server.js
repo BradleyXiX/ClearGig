@@ -22,8 +22,16 @@ app.use('/api/v1/projects', projectRoutes);
 app.use('/api/v1/line-items', lineItemRoutes);
 app.use('/api/v1/clients', clientRoutes);
 
-// Health check endpoint
+// Health check endpoints
 app.get('/api/v1/health', (req, res) => {
+  res.status(200).json({ status: 'ok', message: 'ClearGig API is running.' });
+});
+
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok', message: 'ClearGig API is running.' });
+});
+
+app.get('/', (req, res) => {
   res.status(200).json({ status: 'ok', message: 'ClearGig API is running.' });
 });
 
