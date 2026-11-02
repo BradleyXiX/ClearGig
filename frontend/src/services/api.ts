@@ -1,4 +1,14 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api/v1';
+const getApiBaseUrl = (): string => {
+  const envUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api/v1';
+  const cleanUrl = envUrl.trim().replace(/\/+$/, '');
+  // Append /api/v1 if the user provided only the origin (e.g. https://cleargig-backend.onrender.com)
+  if (!cleanUrl.endsWith('/api/v1')) {
+    return `${cleanUrl}/api/v1`;
+  }
+  return cleanUrl;
+};
+
+export const API_BASE_URL = getApiBaseUrl();
 
 export interface Client {
   id: string;
@@ -59,7 +69,9 @@ export interface UpdateProjectDTO {
 
 // Global fetch helper
 async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE_URL}${endpoint}`, {
+  const baseUrl = getApiBaseUrl();
+  const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  const res = await fetch(`${baseUrl}${path}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
