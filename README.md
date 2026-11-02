@@ -7,14 +7,9 @@
 ![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=nextdotjs)
 ![Node.js](https://img.shields.io/badge/Node.js-Express-green?logo=nodedotjs)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-blue?logo=postgresql)
-![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker)
-![AWS](https://img.shields.io/badge/AWS-EC2%20%2B%20ECR-FF9900?logo=amazonaws)
-
----
-
-## 🌐 Live Demo
-
-**[http://3.84.58.16](http://3.84.58.16)**
+![Vercel](https://img.shields.io/badge/Vercel-Frontend-black?logo=vercel)
+![Render](https://img.shields.io/badge/Render-Backend-46E3B7?logo=render)
+![Supabase](https://img.shields.io/badge/Supabase-Database-3ECF8E?logo=supabase)
 
 ---
 
@@ -34,23 +29,22 @@
 ## 🏗️ Architecture
 
 ```
-┌─────────────────┐     HTTP      ┌─────────────────┐     SQL      ┌──────────────┐
-│   Next.js 16    │ ────────────► │  Express API    │ ───────────► │  PostgreSQL  │
-│   (Port 80)     │               │  (Port 5000)    │              │  (Port 5432) │
-│   TypeScript    │               │  Node.js        │              │  Prisma ORM  │
-└─────────────────┘               └─────────────────┘              └──────────────┘
+┌──────────────────┐       HTTPS       ┌──────────────────┐       SQL       ┌────────────────────────┐
+│     Vercel       │ ────────────────► │      Render      │ ──────────────► │        Supabase        │
+│    (Next.js)     │                   │  (Express API)   │                 │ (PostgreSQL Database)  │
+│ NEXT_PUBLIC_API_ │                   │  Free Web Service│                 │       Free Tier        │
+│       URL        │                   │   render.yaml    │                 │                        │
+└──────────────────┘                   └──────────────────┘                 └────────────────────────┘
 ```
 
-All three services run in Docker containers on a single AWS EC2 instance (t2.micro), orchestrated by Docker Compose.
+ClearGig is 100% hosted on free cloud tiers:
 
-| Layer | Technology |
-|---|---|
-| Frontend | Next.js 16, React 19, TypeScript, Tailwind CSS |
-| Backend | Node.js, Express 5, Prisma ORM |
-| Database | PostgreSQL 15 |
-| Container Registry | AWS ECR (Elastic Container Registry) |
-| Hosting | AWS EC2 (t2.micro — free tier) |
-| CI/CD | GitHub Actions |
+| Layer | Service | Details |
+|---|---|---|
+| Frontend | [Vercel](https://vercel.com) | Next.js 16, React 19, Tailwind CSS |
+| Backend API | [Render](https://render.com) | Node.js Express 5, Prisma ORM (Free Web Service) |
+| Database | [Supabase](https://supabase.com) | PostgreSQL 15 (Free Tier) |
+| CI / Automation | GitHub Actions | Automated Linting, Prisma Generation, and Build verification |
 
 ---
 
@@ -58,24 +52,26 @@ All three services run in Docker containers on a single AWS EC2 instance (t2.mic
 
 ```
 ClearGig/
-├── frontend/               # Next.js app
+├── frontend/               # Next.js app (deployed to Vercel)
 │   ├── src/
 │   │   ├── app/            # Pages (App Router)
 │   │   ├── components/     # Reusable UI components
 │   │   └── services/       # API client (api.ts)
-│   └── Dockerfile
-├── backend/                # Express REST API
+│   ├── vercel.json         # Vercel configuration
+│   └── .env.example
+├── backend/                # Express REST API (deployed to Render)
 │   ├── controllers/        # Route handlers
 │   ├── routes/             # API route definitions
 │   ├── prisma/
-│   │   └── schema.prisma   # Database models
-│   └── Dockerfile
+│   │   └── schema.prisma   # Database models configured for Supabase
+│   ├── render.yaml         # Render blueprint service configuration
+│   └── .env.example
+├── render.yaml             # Root Render Blueprint specification
 ├── docs/                   # Design & specification documents
-├── docker-compose.yml      # Local development
-├── docker-compose.prod.yml # Production (used by CI/CD)
+├── docker-compose.yml      # Local development stack
 └── .github/
     └── workflows/
-        └── deploy.yml      # GitHub Actions CI/CD pipeline
+        └── deploy.yml      # GitHub Actions CI workflow
 ```
 
 ---
@@ -85,7 +81,7 @@ ClearGig/
 ### Prerequisites
 
 - [Node.js 20+](https://nodejs.org)
-- [Docker Desktop](https://www.docker.com/products/docker-desktop)
+- [Docker Desktop](https://www.docker.com/products/docker-desktop) (for local PostgreSQL) or a free [Supabase](https://supabase.com) database
 - [Git](https://git-scm.com)
 
 ### 1. Clone the repository
@@ -95,7 +91,7 @@ git clone https://github.com/BradleyXiX/ClearGig.git
 cd ClearGig
 ```
 
-### 2. Start the database
+### 2. Start the local database (or connect to Supabase)
 
 ```bash
 docker compose up -d db
@@ -105,18 +101,19 @@ docker compose up -d db
 
 ```bash
 cd backend
-cp .env.example .env   # Fill in your DATABASE_URL
+cp .env.example .env   # Fill in your DATABASE_URL (local or Supabase)
 npm install
 npx prisma migrate dev
 npm run dev
 ```
 
-> Backend runs at `http://localhost:5000`
+> Backend runs at `http://localhost:5001` (or configured PORT)
 
 ### 4. Set up the frontend
 
 ```bash
 cd frontend
+cp .env.example .env.local
 npm install
 npm run dev
 ```
@@ -128,61 +125,55 @@ npm run dev
 **Backend (`backend/.env`)**
 
 ```env
-DATABASE_URL="postgresql://admin:password@localhost:5432/cleargig?schema=public"
-PORT=5000
+PORT=5001
+DATABASE_URL="postgresql://postgres:[PASSWORD]@db.[PROJECT-REF].supabase.co:5432/postgres"
 FRONTEND_URL=http://localhost:3000
 ```
 
 **Frontend (`frontend/.env.local`)**
 
 ```env
-NEXT_PUBLIC_API_URL=http://localhost:5000/api/v1
+NEXT_PUBLIC_API_URL=http://localhost:5001/api/v1
 ```
 
 ---
 
-## 🐳 Running with Docker (Full Stack)
+## 🌐 Deployment to Free Platforms
 
-```bash
-docker compose up --build
-```
+### 1. Database (Supabase)
+1. Create a free project on [Supabase](https://supabase.com).
+2. Under **Project Settings → Database**, copy the PostgreSQL connection string URI.
+3. Use this URI as your `DATABASE_URL`.
 
-| Service | URL |
-|---|---|
-| Frontend | http://localhost:3000 |
-| Backend API | http://localhost:5000/api/v1 |
-| PostgreSQL | localhost:5432 |
+### 2. Backend (Render Free Tier)
+1. In [Render](https://render.com), create a new Blueprint or Web Service connecting your GitHub repository.
+2. Render detects `render.yaml` automatically.
+3. Set the environment variable:
+   - `DATABASE_URL`: Your Supabase connection string.
+   - `FRONTEND_URL`: Your Vercel frontend URL (e.g. `https://cleargig.vercel.app`).
+4. Render deploys the backend service with health checks at `/api/v1/health`.
+
+### 3. Frontend (Vercel)
+1. In [Vercel](https://vercel.com), import the repository.
+2. Set the **Root Directory** to `frontend`.
+3. Add the environment variable:
+   - `NEXT_PUBLIC_API_URL`: Your Render backend URL with `/api/v1` (e.g. `https://cleargig-backend.onrender.com/api/v1`).
+4. Deploy!
 
 ---
 
 ## ⚙️ CI/CD Pipeline
 
-Every push to `main` triggers a 3-stage GitHub Actions workflow:
+Every push or pull request to `main` triggers automated GitHub Actions verification:
 
 ```
 git push main
     │
-    ├── 1. lint          → ESLint on frontend code
-    ├── 2. build-and-push → Docker images built & pushed to AWS ECR
-    └── 3. deploy        → SSH into EC2, pull images, restart containers
+    ├── 1. frontend-lint-and-build → ESLint & Next.js production build verification
+    └── 2. backend-validate        → Prisma client generation & syntax check
 ```
 
-### Required GitHub Secrets
-
-| Secret | Description |
-|---|---|
-| `AWS_ACCESS_KEY_ID` | IAM user access key |
-| `AWS_SECRET_ACCESS_KEY` | IAM user secret key |
-| `AWS_REGION` | ECR/EC2 region (e.g. `us-east-1`) |
-| `AWS_ACCOUNT_ID` | 12-digit AWS account ID |
-| `EC2_HOST` | EC2 public IP address |
-| `EC2_USERNAME` | EC2 SSH username (`ubuntu`) |
-| `EC2_SSH_KEY` | Private key (`.pem` file contents) |
-| `POSTGRES_USER` | Database username |
-| `POSTGRES_PASSWORD` | Database password |
-| `POSTGRES_DB` | Database name |
-| `FRONTEND_URL` | Public URL of the frontend |
-| `NEXT_PUBLIC_API_URL` | Public URL of the backend API |
+Deployments are handled automatically by Render and Vercel on push to `main`.
 
 ---
 

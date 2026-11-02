@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+
+# Environment variables
+.env
+.env*.local
+
+# Secrets and credentials
+*.pem
+*.key
+
+# Agent and editor artifacts
+.agent/
+.DS_Store
+
+# Build outputs
+dist/
+.next/
+out/
