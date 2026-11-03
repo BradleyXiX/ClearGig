@@ -1,68 +1,49 @@
 @import "tailwindcss";
 
 :root {
-  --background: #0D0D0E;
-  --foreground: #F2F2F2;
-  --card: 20, 20, 22;
-  --card-foreground: #F2F2F2;
-  --primary: #D4FF00; /* Tech Chartreuse */
-  --primary-foreground: #0D0D0E;
-  --secondary: #1C1C1F;
-  --secondary-foreground: #E0E0E0;
-  --muted: #1C1C1F;
-  --muted-foreground: #8F8F94;
-  --border: 45, 45, 50;
-  --radius: 0.75rem;
+  --paper: #F7F4EE;
+  --paper-raised: #FFFDF8;
+  --paper-sunken: #EFEBE1;
+  --ink: #14140F;
+  --ink-muted: #5C5A52;
+  --rule: #D9D4C7;
+  --rule-strong: #B9B2A1;
+  --accent: #1E4A3C;
+  --accent-wash: #E7EDE8;
+  --danger: #8A2B1F;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-border: var(--border);
-  --radius-xl: var(--radius);
+  --color-paper: var(--paper);
+  --color-paper-raised: var(--paper-raised);
+  --color-paper-sunken: var(--paper-sunken);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-rule: var(--rule);
+  --color-rule-strong: var(--rule-strong);
+  --color-accent: var(--accent);
+  --color-accent-wash: var(--accent-wash);
+  --color-danger: var(--danger);
+
+  --radius-card: 4px;
+  --radius-control: 2px;
+  --ease-ledger: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-sans), system-ui, sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
-/* Advanced Glassmorphism utility */
-.glass {
-  background: rgba(var(--card), 0.3);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border: 1px solid rgba(var(--border), 0.6);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255,255,255,0.05);
+@page {
+  size: letter portrait;
+  margin: 18mm;
 }
 
-/* Custom Scrollbar for Tech Vibe */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: var(--background);
-  border-left: 1px solid rgba(255,255,255,0.02);
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--muted-foreground);
-  border-radius: 8px;
-  border: 2px solid var(--background);
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: var(--primary);
+@media print {
+  .no-print {
+    display: none;
+  }
 }
