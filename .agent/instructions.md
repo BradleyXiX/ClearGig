@@ -34,11 +34,12 @@ The following libraries and patterns are **explicitly out of scope and forbidden
 - **Heavy Type Weights**: Cap at semibold (`font-semibold` / 600). No `font-black` or 800/900.
 - **Italics**: No italic text anywhere in the interface.
 
-### 3. Typography & Motion
+### 3. Typography, Motion, Icons & Dependencies
 - Typefaces: Geist Sans for headings and body; Geist Mono for all tabular figures, monetary totals, dates, and codes.
 - Numbers: Right-aligned with `font-mono tabular-nums`.
 - Motion: Max 400ms using `cubic-bezier(0.22, 1, 0.36, 1)`, scoped to `transform` and `opacity` only. No `transition-all`.
-- Icons: `lucide-react` with 1.5px stroke, 20px size, inheriting `currentColor`.
+- Icons: `lucide-react` with 1.5px stroke, 20px size, inheriting `currentColor`. This is a recorded exception to the design system; do not migrate to Phosphor.
+- Dependencies: No new dependencies may be added under any circumstances. The removed packages (three, @react-three/fiber, @react-three/drei, lenis, gsap, @gsap/react) must never be reinstalled.
 
 ### 4. Verification Gates
 Before proposing or committing changes:
