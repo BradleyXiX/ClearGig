@@ -1,8 +1,8 @@
 /* eslint-disable */
 'use client';
 import { useState, useEffect } from 'react';
-import gsap from 'gsap';
-import { useGSAP } from '@gsap/react';
+
+
 
 export default function Home() {
   const [step, setStep] = useState(0);
@@ -28,19 +28,9 @@ export default function Home() {
     setDate(new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }));
   }, []);
 
-  useGSAP(() => {
-    gsap.to('.scanner-line', {
-      y: '90vh',
-      duration: 3,
-      repeat: -1,
-      yoyo: true,
-      ease: 'sine.inOut'
-    });
-  }, []);
-
   useEffect(() => {
-    document.body.style.overflow = step === 5 ? 'auto' : 'hidden'; // Allow scrolling ONLY on the final report
-    return () => { document.body.style.overflow = 'auto'; };
+     // Allow scrolling ONLY on the final report
+    return () => {  };
   }, [step]);
 
   const handleNext = (e?: React.FormEvent) => {
@@ -53,9 +43,9 @@ export default function Home() {
   };
 
   const getStepClasses = (index: number) => {
-    if (step === 5) return 'opacity-0 scale-[4] blur-3xl z-0 pointer-events-none translate-y-[-20%]'; // Hide all steps on final report
+    if (step === 5) return 'opacity-0 z-0 pointer-events-none translate-y-[-20%]'; // Hide all steps on final report
     if (step === index) return 'opacity-100 scale-100 blur-none z-20 pointer-events-auto';
-    if (step > index) return 'opacity-0 scale-[4] blur-3xl z-0 pointer-events-none translate-y-[-20%]'; 
+    if (step > index) return 'opacity-0 z-0 pointer-events-none translate-y-[-20%]'; 
     return 'opacity-0 scale-50 blur-xl z-0 pointer-events-none translate-y-[20%]'; 
   };
 
@@ -64,7 +54,7 @@ export default function Home() {
       
       {/* Right Panel: The Blueprint (Expands to Full Screen on Step 5) */}
       <div className={`absolute top-0 right-0 z-10 pointer-events-none transition-all duration-[850ms] ease-[cubic-bezier(0.23,1,0.32,1)] ${step === 5 ? 'w-full min-h-screen p-4 md:p-12 relative' : 'w-full md:w-1/2 h-screen p-8 md:p-12'}`}>
-        <div className={`w-full glass rounded-3xl p-8 flex flex-col font-mono relative pointer-events-auto transition-all duration-[850ms] ${step === 5 ? 'min-h-[90vh] bg-card/80 backdrop-blur-3xl border-primary/30 shadow-[0_0_80px_rgba(212,255,0,0.1)]' : 'h-full justify-between'}`}>
+        <div className={`w-full glass rounded-3xl p-8 flex flex-col font-mono relative pointer-events-auto transition-all duration-[850ms] ${step === 5 ? 'min-h-[90vh] bg-card/80 border-primary/30 shadow-[0_0_80px_rgba(212,255,0,0.1)]' : 'h-full justify-between'}`}>
           
           {step !== 5 && <div className="scanner-line absolute top-0 left-0 w-full h-[2px] bg-primary/80 shadow-[0_0_30px_#D4FF00] z-50 pointer-events-none" />}
           
@@ -169,8 +159,8 @@ export default function Home() {
           
           {step === 5 && (
             <div className="absolute top-8 left-1/2 -translate-x-1/2 flex gap-4 pointer-events-auto">
-               <button onClick={() => { setStep(0); setClient(''); setTitle(''); setFrontend(''); setBackend(''); }} className="px-6 py-2 bg-secondary text-foreground text-xs font-bold uppercase tracking-widest rounded-full hover:bg-white hover:text-black transition-colors cursor-none">Start Over</button>
-               <button className="px-6 py-2 bg-primary text-black text-xs font-bold uppercase tracking-widest rounded-full hover:scale-105 transition-transform cursor-none shadow-[0_0_15px_rgba(212,255,0,0.4)]">Export PDF</button>
+               <button onClick={() => { setStep(0); setClient(''); setTitle(''); setFrontend(''); setBackend(''); }} className="px-6 py-2 bg-secondary text-foreground text-xs font-bold uppercase tracking-widest rounded-full hover:bg-white hover:text-black transition-colors ">Start Over</button>
+               <button className="px-6 py-2 bg-primary text-black text-xs font-bold uppercase tracking-widest rounded-full hover:scale-105 transition-transform shadow-[0_0_15px_rgba(212,255,0,0.4)]">Export PDF</button>
             </div>
           )}
 
@@ -193,7 +183,7 @@ export default function Home() {
             className="text-2xl md:text-4xl bg-transparent border-b-2 border-border focus:border-primary focus:outline-none py-4 w-full md:w-3/4 transition-colors font-mono"
             autoFocus
           />
-          <button onClick={handleNext} className="mt-12 self-start uppercase tracking-widest text-xs text-primary font-bold hover:scale-110 transition-transform cursor-none flex items-center gap-2">
+          <button onClick={handleNext} className="mt-12 self-start uppercase tracking-widest text-xs text-primary font-bold hover:scale-110 transition-transform flex items-center gap-2">
             Press Enter <span className="text-lg">→</span>
           </button>
         </div>
@@ -211,8 +201,8 @@ export default function Home() {
             className="text-2xl md:text-4xl bg-transparent border-b-2 border-border focus:border-primary focus:outline-none py-4 w-full md:w-3/4 transition-colors font-mono"
           />
           <div className="mt-12 flex gap-8">
-            <button onClick={() => setStep(0)} className="uppercase tracking-widest text-xs text-muted-foreground hover:text-foreground transition-colors cursor-none">← Back</button>
-            <button onClick={handleNext} className="uppercase tracking-widest text-xs text-primary font-bold hover:scale-110 transition-transform cursor-none flex items-center gap-2">Press Enter <span className="text-lg">→</span></button>
+            <button onClick={() => setStep(0)} className="uppercase tracking-widest text-xs text-muted-foreground hover:text-foreground transition-colors ">← Back</button>
+            <button onClick={handleNext} className="uppercase tracking-widest text-xs text-primary font-bold hover:scale-110 transition-transform flex items-center gap-2">Press Enter <span className="text-lg">→</span></button>
           </div>
         </div>
 
@@ -232,8 +222,8 @@ export default function Home() {
             <span className="text-2xl md:text-3xl text-muted-foreground mb-4 font-mono">hours</span>
           </div>
           <div className="mt-12 flex gap-8">
-            <button onClick={() => setStep(1)} className="uppercase tracking-widest text-xs text-muted-foreground hover:text-foreground transition-colors cursor-none">← Back</button>
-            <button onClick={handleNext} className="uppercase tracking-widest text-xs text-primary font-bold hover:scale-110 transition-transform cursor-none flex items-center gap-2">Press Enter <span className="text-lg">→</span></button>
+            <button onClick={() => setStep(1)} className="uppercase tracking-widest text-xs text-muted-foreground hover:text-foreground transition-colors ">← Back</button>
+            <button onClick={handleNext} className="uppercase tracking-widest text-xs text-primary font-bold hover:scale-110 transition-transform flex items-center gap-2">Press Enter <span className="text-lg">→</span></button>
           </div>
         </div>
 
@@ -253,8 +243,8 @@ export default function Home() {
             <span className="text-2xl md:text-3xl text-muted-foreground mb-4 font-mono">hours</span>
           </div>
           <div className="mt-12 flex gap-8">
-            <button onClick={() => setStep(2)} className="uppercase tracking-widest text-xs text-muted-foreground hover:text-foreground transition-colors cursor-none">← Back</button>
-            <button onClick={handleNext} className="uppercase tracking-widest text-xs text-primary font-bold hover:scale-110 transition-transform cursor-none flex items-center gap-2">Press Enter <span className="text-lg">→</span></button>
+            <button onClick={() => setStep(2)} className="uppercase tracking-widest text-xs text-muted-foreground hover:text-foreground transition-colors ">← Back</button>
+            <button onClick={handleNext} className="uppercase tracking-widest text-xs text-primary font-bold hover:scale-110 transition-transform flex items-center gap-2">Press Enter <span className="text-lg">→</span></button>
           </div>
         </div>
 
@@ -262,10 +252,10 @@ export default function Home() {
           <h1 className="text-6xl md:text-8xl font-bold tracking-tighter leading-tight mb-12">
             Blueprint <br/><span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-emerald-500">Assembled.</span>
           </h1>
-          <button onClick={handleNext} className="bg-primary text-primary-foreground font-bold text-xl md:text-2xl px-12 py-6 rounded-full hover:scale-105 transition-transform duration-[850ms] shadow-[0_0_40px_rgba(212,255,0,0.4)] cursor-none self-start">
+          <button onClick={handleNext} className="bg-primary text-primary-foreground font-bold text-xl md:text-2xl px-12 py-6 rounded-full hover:scale-105 transition-transform duration-[850ms] shadow-[0_0_40px_rgba(212,255,0,0.4)] self-start">
             Generate Proposal
           </button>
-          <button onClick={() => setStep(3)} className="mt-8 self-start uppercase tracking-widest text-xs text-muted-foreground hover:text-foreground transition-colors cursor-none">
+          <button onClick={() => setStep(3)} className="mt-8 self-start uppercase tracking-widest text-xs text-muted-foreground hover:text-foreground transition-colors ">
             ← Edit Scope
           </button>
         </div>

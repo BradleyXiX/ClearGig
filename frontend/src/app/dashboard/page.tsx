@@ -1,7 +1,5 @@
 'use client';
 import { useState, useEffect } from 'react';
-import gsap from 'gsap';
-import { useGSAP } from '@gsap/react';
 import { api, Project, Client } from '@/services/api';
 
 export default function Dashboard() {
@@ -22,37 +20,6 @@ export default function Dashboard() {
     document.body.style.overflow = selectedProject ? 'hidden' : 'auto';
     return () => { document.body.style.overflow = 'auto'; };
   }, [selectedProject]);
-
-  useGSAP(() => {
-    if (loading) return;
-    
-    // Smooth bezier curve for high-end feel
-    const customEase = 'cubic-bezier(0.16, 1, 0.3, 1)';
-
-    if (!selectedProject) {
-      gsap.fromTo('.dashboard-item', 
-        { opacity: 0, y: 15 },
-        { opacity: 1, y: 0, duration: 0.6, stagger: 0.05, ease: customEase, overwrite: 'auto' }
-      );
-      gsap.to('.dashboard-container', { opacity: 1, scale: 1, filter: 'blur(0px)', pointerEvents: 'auto', duration: 0.4, ease: customEase });
-      
-      gsap.to('.project-drawer', { x: '100%', pointerEvents: 'none', duration: 0.5, ease: customEase });
-      gsap.to('.drawer-backdrop', { opacity: 0, pointerEvents: 'none', duration: 0.4 });
-    } else {
-      gsap.to('.dashboard-container', { opacity: 0.4, scale: 0.99, filter: 'blur(2px)', pointerEvents: 'none', duration: 0.5, ease: customEase });
-      
-      gsap.to('.drawer-backdrop', { opacity: 1, pointerEvents: 'auto', duration: 0.4 });
-      gsap.fromTo('.project-drawer', 
-        { x: '100%' },
-        { x: '0%', pointerEvents: 'auto', duration: 0.6, ease: customEase }
-      );
-      
-      gsap.fromTo('.drawer-content > *',
-        { opacity: 0, x: 15 },
-        { opacity: 1, x: 0, duration: 0.5, stagger: 0.05, ease: customEase, delay: 0.1 }
-      );
-    }
-  }, [loading, selectedProject]);
 
   if (loading) return <div className="min-h-screen flex items-center justify-center font-mono text-primary uppercase tracking-widest text-sm">Loading...</div>;
 
@@ -92,7 +59,7 @@ export default function Dashboard() {
     return (
       <>
         <div 
-          className="drawer-backdrop fixed inset-0 z-40 bg-black/40 backdrop-blur-sm opacity-0 pointer-events-none cursor-none"
+          className="drawer-backdrop fixed inset-0 z-40 bg-black/40 backdrop-blur-sm opacity-0 pointer-events-none "
           onClick={() => setSelectedProject(null)}
         />
         
@@ -103,7 +70,7 @@ export default function Dashboard() {
             
             <button 
               onClick={() => setSelectedProject(null)} 
-              className="absolute top-10 right-10 text-muted-foreground hover:text-foreground transition-colors cursor-none"
+              className="absolute top-10 right-10 text-muted-foreground hover:text-foreground transition-colors "
             >
                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
             </button>
@@ -237,7 +204,7 @@ export default function Dashboard() {
                   <div 
                     key={p.id} 
                     onClick={() => setSelectedProject(p)}
-                    className="flex items-center justify-between p-4 rounded-xl border border-transparent hover:border-border/50 hover:bg-card/40 transition-all cursor-none group"
+                    className="flex items-center justify-between p-4 rounded-xl border border-transparent hover:border-border/50 hover:bg-card/40 transition-all group"
                   >
                     <div className="flex items-center gap-4">
                       <div className="w-8 h-8 rounded-full border border-border/50 flex items-center justify-center group-hover:border-primary/50 transition-colors">
