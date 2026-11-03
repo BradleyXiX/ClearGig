@@ -119,6 +119,10 @@ Evidence from the current source, not impressions.
 
 All three share the same de-clunk baseline (§6), which is direction independent.
 
+**Size.** With FinOps kept, this is a project, not a session: three routes, one
+new print route with two variants, a money-math module, a dependency removal
+pass, and a component split. Plan it as roughly a dozen tasks.
+
 ---
 
 ## 6. The Ledger system
@@ -153,9 +157,9 @@ headings and buttons; the only uppercase is the label style.
 
 **This is the one area where the design values in the skill do not cover the
 needed surface.** The skill defines dark backgrounds only, and this direction is
-paper. The palette below is a proposal, approved by the user through this
-document rather than invented silently. It is the only new palette in the
-project and it replaces the dark set, it does not extend it.
+paper. The palette below is a proposal, approved by the user on 2026-11-03
+rather than invented silently. It is the only new palette in the project and it
+replaces the dark set, it does not extend it.
 
 | Token | Hex | Use | Contrast on paper |
 |---|---|---|---|
@@ -242,9 +246,47 @@ focus returns to the triggering row.
 the left, summary and global toggles on the right. Ranges become numeric inputs
 with a visible unit, because a 5% step slider is imprecise for money. Status
 select becomes the stamp with a menu. Delete moves into an overflow menu and
-uses an inline confirm, not `window.confirm`. The FinOps mode is gone, so the
-right rail holds only the totals, the contingency and margin fields, and the
-export action.
+uses an inline confirm, not `window.confirm`. A two-item switch sits under the
+title: **Estimate** and **FinOps audit**. The right rail holds the totals, the
+contingency and margin fields, and the export action for whichever surface is
+active.
+
+---
+
+### 6.7 The FinOps audit surface
+
+Kept, because it is a real offer. Restyled, because it currently looks like a
+different company. It reuses every token in §6.1 to §6.5; it introduces no new
+font, color, spacing value or radius.
+
+**It is a document, not a panel.** A savings audit is a report a client signs,
+so it gets the same paper, folio, rules and signature block as the estimate.
+`DocumentShell` owns that chrome; the two variants differ only in body content.
+
+**The model is unchanged.** These five values must compute exactly as they do
+today (`SummaryPanel.tsx:49-61`):
+
+| Value | Formula |
+|---|---|
+| Monthly savings | `monthlySpend × savingsRate` |
+| Optimized spend | `monthlySpend − monthlySavings` |
+| Annualized savings | `monthlySavings × 12` |
+| Contingency fee | `monthlySavings × 3 × 0.5` |
+| Client net first year | `annualizedSavings − contingencyFee` |
+
+Defaults stay: `monthlySpend` seeds from recurring cost, else 12500; `savingsRate`
+30%.
+
+**What changes visually.** The primary-tinted panel, the emerald "50% contingency
+model" badge, the sparkles icon and the Venture #9 pill all go. The fee model
+becomes a plain terms block in label style under the totals: "Fee: 50% of the
+first three months of savings". The toggle becomes a two-item switch with no
+colour except the active underline in `--accent`. Inputs become bordered wells on
+`--paper-sunken` with the unit outside the field, as in the estimate.
+
+**What changes structurally.** State and math move out of `SummaryPanel` into a
+`finops.ts` module with a `computeAudit(input)` function and its own `node:test`
+cases, because this math is money and it is currently untested and inline.
 
 ---
 
@@ -271,9 +313,9 @@ broken product.
 
 ## 8. Left to the builder
 
-- Component file boundaries. `SummaryPanel` shrinks to a presentational summary
-  once FinOps mode is deleted; the remaining split is between the totals helper,
-  the summary component, and the print document.
+- Component file boundaries. `SummaryPanel` (530 lines) splits into
+  `EstimateSummary`, `FinOpsAudit`, a shared `DocumentShell`, and a
+  `finops.ts` module for the money math.
 - Whether the wizard keeps local state or moves to a form library. Either is
   fine; no new dependency.
 - Empty, loading and error visuals within the system: skeletons shaped like the
@@ -296,8 +338,8 @@ Resolved below. Anything marked **open** is waiting on the user.
 |---|---|---|
 | D1 | What rate and contingency does the wizard write? The five questions only collect names and hours, and `POST /line-items` requires `description`, `category`, `estimated_hours`, `hourly_rate`. | Step 3 gains one **shared hourly rate** field beside hours, prefilled from the last used rate (`localStorage`), falling back to 150. Contingency defaults to 15% and is editable on the document step. Still five questions. The value is visible and editable, so it stops being the hidden constant that made S1 a defect. The rate applies to both line items. |
 | D2 | Does every wizard run create a new client? `Client.name` has no unique constraint, so "Acme" twice yields two rows. | Step 1 becomes a combobox: pick an existing client from `getClients()` or type a new one. Creating a client is skipped when one is selected. |
-| D3 | Does Cloud FinOps Audit Mode survive? It is a second product inside `SummaryPanel` (about 250 lines, its own print document, "Venture #9", a guarantee panel). | **Deleted.** Removes ~250 lines, the Venture #9 toggle, the cloud-spend math, the guarantee panel, and the "CLOUD FINOPS SAVINGS AUDIT & PROPOSAL" print document. `SummaryPanel` becomes a presentational summary of roughly 60 lines. If FinOps is still needed it belongs in its own repo with its own design. |
-| D4 | What does Export PDF produce, and can it run before save? | A dedicated print document rendered from the ledger at `/projects/[id]/document`, with folio, ruled rows, totals, signature block. Built fresh: the old print block at `SummaryPanel.tsx:87-119` is deleted with FinOps mode, and it was wrong anyway (it hides `header, nav, aside, button, input, select` globally and forces `.grid` to `display:block`). Export is unavailable until the estimate exists. |
+| D3 | Does Cloud FinOps Audit Mode survive? It is a second product inside `SummaryPanel` (about 250 lines, its own print document, "Venture #9", a guarantee panel). | **Kept and restyled, per the user.** It is not a panel inside the estimate summary any more — it becomes a second surface on the project, reachable from a two-item switch on `/projects/[id]`: *Estimate* and *FinOps audit*. It keeps its own math and its own printed document, rebuilt in the Ledger system (§6.7) so one project can produce two artifacts that look like they came from the same firm. The cheapest alternative — leave the component untouched — is rejected because a neon widget inside a paper document is the exact clash this redesign exists to remove. |
+| D4 | What does Export PDF produce, and can it run before save? | One printable document shell, `DocumentShell`, with two variants: `estimate` at `/projects/[id]/document` and `audit` at `/projects/[id]/document?variant=audit`. Both render folio, ruled rows, totals and a signature block from the same primitives. The old print block at `SummaryPanel.tsx:87-119` is deleted: it hides `header, nav, aside, button, input, select` globally and forces `.grid` to `display:block`, which breaks any page it runs on. Export is unavailable until the estimate exists. |
 | D5 | What is a "total"? Three definitions exist. | One helper `computeTotals(project)` used by every screen and the print document: `base + contingency + profit margin`, recurring items excluded from the one-time total and shown as a separate monthly line. `API_SPEC.md:157-164` is the reference. **Bug to fix:** `dashboard/page.tsx:73-80` applies contingency inside the line-item loop, so it compounds per row and ignores margin entirely. |
 | D6 | Is saving on the detail page explicit or automatic? | Explicit `Save estimate`, as today, with a dirty indicator and a disabled state until something changes. The existing `isLocked` rule is kept: non-DRAFT hides add-item and row delete. |
 | D7 | Where does the folio come from? `Project` has no number field and the id is a UUID. | Deterministic presentational value: `EST-{createdAt year}-{first 4 of id, uppercased}`. Stable across screen and print, no collision in practice, no API change. Replaces the random per-mount id at `page.tsx:27`. |
@@ -323,4 +365,7 @@ to defer to this document.
   `dark:`.
 - No dependency added; the five removed animation dependencies are gone from
   `package.json`.
-- No `FinOps`, `Venture`, or `Audit Mode` strings remain in `frontend/src`.
+- Both document variants print to a single letter page, and the audit document
+  shows all five FinOps values from §6.7.
+- `finops.ts` has `node:test` cases covering the five formulas, including a zero
+  spend and a zero rate.
