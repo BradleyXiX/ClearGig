@@ -1,23 +1,22 @@
 const prisma = require('../prismaClient');
 
 // Get all clients
-exports.getClients = async (req, res) => {
+exports.getClients = async (req, res, next) => {
   try {
     const clients = await prisma.client.findMany({
       orderBy: { createdAt: 'desc' }
     });
     res.json(clients);
   } catch (error) {
-    console.error('Error fetching clients:', error);
-    res.status(500).json({ error: 'Failed to fetch clients', details: error.message });
+    next(error);
   }
 };
 
 // Create a new client
-exports.createClient = async (req, res) => {
+exports.createClient = async (req, res, next) => {
   try {
     const { name, email } = req.body;
-    
+
     if (!name) {
       return res.status(400).json({ error: 'Client name is required' });
     }
@@ -28,10 +27,12 @@ exports.createClient = async (req, res) => {
         email: email || null
       }
     });
-    
+
     res.status(201).json(client);
   } catch (error) {
-    console.error('Error creating client:', error);
-    res.status(500).json({ error: 'Failed to create client', details: error.message });
+    // Never respond with the raw Prisma message: for a dead database it is a
+    // generated-client snippet containing an absolute Windows path. The shared
+    // error middleware maps it to a short, client-safe shape.
+    next(error);
   }
 };

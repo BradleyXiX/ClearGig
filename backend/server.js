@@ -6,6 +6,7 @@ require('dotenv').config();
 const projectRoutes = require('./routes/projects');
 const lineItemRoutes = require('./routes/lineItems');
 const clientRoutes = require('./routes/clients');
+const { toHttpError } = require('./utils/httpError');
 
 const app = express();
 const port = process.env.PORT || 5001;
@@ -36,10 +37,15 @@ app.get('/', (req, res) => {
   res.status(200).json({ status: 'ok', message: 'ClearGig API is running.' });
 });
 
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ error: 'Something went wrong!', details: err.message });
+// Error handling middleware.
+// Clients never see raw error text: utils/httpError.js maps every throw to a
+// short stable shape. The full error, including Prisma's generated-client dump,
+// goes to the server log only.
+app.use((err, req, res, next) => { // eslint-disable-line no-unused-vars
+  const { status, body } = toHttpError(err);
+  console.error(`[${req.method} ${req.originalUrl}] -> ${status} ${body.code}`);
+  console.error(err);
+  res.status(status).json(body);
 });
 
 // Helper to run database migrations with a safety timeout so it never blocks web traffic
