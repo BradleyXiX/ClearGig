@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import LineItemTable from '@/components/LineItemTable';
 import { EstimateSummary } from '@/components/EstimateSummary';
+import { FinOpsAudit } from '@/components/FinOpsAudit';
 
 export default function ProjectDetail() {
   const { id } = useParams() as { id: string };
@@ -21,6 +22,7 @@ export default function ProjectDetail() {
   const [isSaving, setIsSaving] = useState(false);
   const [statusMenuOpen, setStatusMenuOpen] = useState(false);
   const [confirmDeleteProject, setConfirmDeleteProject] = useState(false);
+  const [activeTab, setActiveTab] = useState<'estimate' | 'audit'>('estimate');
 
   // Local state for editable settings
   const [contingencyPercentage, setContingencyPercentage] = useState(0);
@@ -109,8 +111,12 @@ export default function ProjectDetail() {
     }
   };
 
-  const handleExport = () => {
+  const handleExportEstimate = () => {
     window.open(`/projects/${id}/document`, '_blank');
+  };
+
+  const handleExportAudit = () => {
+    window.open(`/projects/${id}/document?variant=audit`, '_blank');
   };
 
   if (isLoading) {
@@ -221,15 +227,23 @@ export default function ProjectDetail() {
         <div className="flex items-center gap-6 border-b border-rule mt-6">
           <button
             type="button"
-            className="py-2 border-b-2 border-accent text-ink font-medium text-sm transition-colors duration-150"
+            onClick={() => setActiveTab('estimate')}
+            className={`py-2 border-b-2 text-sm transition-colors duration-150 ${
+              activeTab === 'estimate'
+                ? 'border-accent text-ink font-medium'
+                : 'border-transparent text-ink-muted hover:text-ink'
+            }`}
           >
             Estimate
           </button>
           <button
             type="button"
-            disabled
-            aria-disabled="true"
-            className="py-2 border-b-2 border-transparent text-ink-muted text-sm opacity-50 cursor-not-allowed transition-colors duration-150"
+            onClick={() => setActiveTab('audit')}
+            className={`py-2 border-b-2 text-sm transition-colors duration-150 ${
+              activeTab === 'audit'
+                ? 'border-accent text-ink font-medium'
+                : 'border-transparent text-ink-muted hover:text-ink'
+            }`}
           >
             FinOps audit
           </button>
@@ -238,114 +252,135 @@ export default function ProjectDetail() {
 
       {/* Two-column layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left Column: Form + Ruled Ledger */}
+        {/* Left Column */}
         <div className="lg:col-span-2 space-y-8">
-          {/* Add Line Item Form (hidden when locked) */}
-          {isLocked ? (
-            <div className="border border-rule rounded-card bg-paper-sunken p-6 text-center">
-              <p className="text-sm text-ink-muted">
-                Estimate is locked ({status}). Switch status back to DRAFT to add or remove items.
-              </p>
-            </div>
+          {activeTab === 'estimate' ? (
+            <>
+              {/* Add Line Item Form (hidden when locked) */}
+              {isLocked ? (
+                <div className="border border-rule rounded-card bg-paper-sunken p-6 text-center">
+                  <p className="text-sm text-ink-muted">
+                    Estimate is locked ({status}). Switch status back to DRAFT to add or remove items.
+                  </p>
+                </div>
+              ) : (
+                <div className="border border-rule rounded-card bg-paper-raised p-6">
+                  <h2 className="text-xs font-medium uppercase tracking-wider text-ink-muted mb-4">
+                    Add line item
+                  </h2>
+                  <form onSubmit={handleAddLineItem} className="space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-xs font-medium uppercase tracking-wider text-ink-muted block mb-1">
+                          Category
+                        </label>
+                        <select
+                          value={category}
+                          onChange={(e) => setCategory(e.target.value as typeof category)}
+                          className="w-full bg-paper-raised text-ink border border-rule rounded-control px-3 py-2 text-sm focus:outline-none focus:border-accent"
+                        >
+                          <option value="FRONTEND">Frontend</option>
+                          <option value="BACKEND">Backend</option>
+                          <option value="CLOUD">Cloud</option>
+                          <option value="MAINTENANCE">Maintenance</option>
+                        </select>
+                      </div>
+                      <div>
+                        <Field
+                          label="Description"
+                          type="text"
+                          placeholder="Scope module description"
+                          value={description}
+                          onChange={(e) => setDescription(e.target.value)}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Field
+                          label="Estimated hours"
+                          type="number"
+                          step="0.5"
+                          min="0"
+                          suffix="hrs"
+                          value={estimatedHours}
+                          onChange={(e) => setEstimatedHours(e.target.value)}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Field
+                          label="Hourly rate"
+                          type="number"
+                          step="1"
+                          min="0"
+                          suffix="$/hr"
+                          value={hourlyRate}
+                          onChange={(e) => setHourlyRate(e.target.value)}
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2 border-t border-rule">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={isRecurring}
+                          onChange={(e) => setIsRecurring(e.target.checked)}
+                          className="accent-accent w-4 h-4 rounded-control"
+                        />
+                        <span className="text-xs uppercase tracking-wider text-ink">
+                          Recurring monthly cost
+                        </span>
+                      </label>
+                      <Button variant="secondary" size="sm" type="submit">
+                        Add item
+                      </Button>
+                    </div>
+                  </form>
+                </div>
+              )}
+
+              {/* Line items ledger */}
+              <div className="border border-rule rounded-card bg-paper-raised p-6">
+                <h2 className="text-xs font-medium uppercase tracking-wider text-ink-muted mb-4">
+                  Line items ledger
+                </h2>
+                <LineItemTable
+                  items={project.lineItems || []}
+                  onDelete={handleDeleteLineItem}
+                  isLocked={isLocked}
+                />
+              </div>
+            </>
           ) : (
-            <div className="border border-rule rounded-card bg-paper-raised p-6">
-              <h2 className="text-xs font-medium uppercase tracking-wider text-ink-muted mb-4">
-                Add line item
-              </h2>
-              <form onSubmit={handleAddLineItem} className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-xs font-medium uppercase tracking-wider text-ink-muted block mb-1">
-                      Category
-                    </label>
-                    <select
-                      value={category}
-                      onChange={(e) => setCategory(e.target.value as typeof category)}
-                      className="w-full bg-paper-raised text-ink border border-rule rounded-control px-3 py-2 text-sm focus:outline-none focus:border-accent"
-                    >
-                      <option value="FRONTEND">Frontend</option>
-                      <option value="BACKEND">Backend</option>
-                      <option value="CLOUD">Cloud</option>
-                      <option value="MAINTENANCE">Maintenance</option>
-                    </select>
-                  </div>
-                  <div>
-                    <Field
-                      label="Description"
-                      type="text"
-                      placeholder="Scope module description"
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Field
-                      label="Estimated hours"
-                      type="number"
-                      step="0.5"
-                      min="0"
-                      suffix="hrs"
-                      value={estimatedHours}
-                      onChange={(e) => setEstimatedHours(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Field
-                      label="Hourly rate"
-                      type="number"
-                      step="1"
-                      min="0"
-                      suffix="$/hr"
-                      value={hourlyRate}
-                      onChange={(e) => setHourlyRate(e.target.value)}
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between pt-2 border-t border-rule">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={isRecurring}
-                      onChange={(e) => setIsRecurring(e.target.checked)}
-                      className="accent-accent w-4 h-4 rounded-control"
-                    />
-                    <span className="text-xs uppercase tracking-wider text-ink">
-                      Recurring monthly cost
-                    </span>
-                  </label>
-                  <Button variant="secondary" size="sm" type="submit">
-                    Add item
-                  </Button>
-                </div>
-              </form>
-            </div>
-          )}
-
-          {/* Line items ledger */}
-          <div className="border border-rule rounded-card bg-paper-raised p-6">
-            <h2 className="text-xs font-medium uppercase tracking-wider text-ink-muted mb-4">
-              Line items ledger
-            </h2>
-            <LineItemTable
-              items={project.lineItems || []}
-              onDelete={handleDeleteLineItem}
-              isLocked={isLocked}
+            <FinOpsAudit
+              defaultMonthlySpend={
+                currentTotals.recurringMonthly > 0 ? currentTotals.recurringMonthly : 12500
+              }
             />
-          </div>
+          )}
         </div>
 
         {/* Right Column: Summary rail + Global toggles + Delete */}
         <div className="space-y-6">
-          <EstimateSummary
-            totals={currentTotals}
-            contingencyPercentage={contingencyPercentage}
-            profitMargin={profitMargin}
-            onExport={handleExport}
-          />
+          {activeTab === 'estimate' ? (
+            <EstimateSummary
+              totals={currentTotals}
+              contingencyPercentage={contingencyPercentage}
+              profitMargin={profitMargin}
+              onExport={handleExportEstimate}
+            />
+          ) : (
+            <div className="border border-rule rounded-card bg-paper-raised p-6 space-y-4">
+              <h2 className="text-xs font-medium uppercase tracking-wider text-ink-muted">
+                Audit export
+              </h2>
+              <Button variant="primary" onClick={handleExportAudit} className="w-full">
+                Export audit
+              </Button>
+            </div>
+          )}
 
           {/* Global Toggles */}
           <div className="border border-rule rounded-card bg-paper-raised p-6 space-y-4">
