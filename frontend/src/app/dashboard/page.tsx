@@ -5,20 +5,40 @@ import { useRouter } from 'next/navigation';
 import { api, type Project, type Client } from '@/services/api';
 import { computeTotals } from '@/lib/totals';
 import { Stamp } from '@/components/ui/Stamp';
+import { Button } from '@/components/ui/Button';
 
 export default function DashboardPage() {
   const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
-    Promise.all([api.getProjects(), api.getClients()]).then(([pData, cData]) => {
-      setProjects(pData);
-      setClients(cData);
-      setLoading(false);
-    });
-  }, []);
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+
+    Promise.all([api.getProjects(), api.getClients()])
+      .then(([pData, cData]) => {
+        if (cancelled) return;
+        setProjects(pData);
+        setClients(cData);
+        setLoading(false);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        // Without this the page sat on its skeleton forever: "database is
+        // offline" and "no estimates yet" looked identical.
+        setError(err instanceof Error ? err.message : 'Could not load estimates.');
+        setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [reloadKey]);
 
   const clientMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -50,6 +70,23 @@ export default function DashboardPage() {
         </h1>
       </div>
 
+      {error ? (
+        <div className="border border-rule rounded-card bg-paper-raised p-6 max-w-xl">
+          <h2 className="text-lg font-semibold text-ink">Could not load estimates</h2>
+          <p className="mt-2 text-sm text-ink-muted">{error}</p>
+          <p className="mt-2 text-sm text-ink-muted">
+            Nothing is lost. The API reads from the database, so it cannot list
+            anything while the database is unreachable.
+          </p>
+          <Button
+            variant="secondary"
+            className="mt-4"
+            onClick={() => setReloadKey((k) => k + 1)}
+          >
+            Try again
+          </Button>
+        </div>
+      ) : (
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Main Estimates Ledger */}
         <div className="lg:col-span-2">
@@ -157,6 +194,7 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }
