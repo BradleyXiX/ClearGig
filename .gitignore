@@ -10,7 +10,8 @@ node_modules/
 *.key
 
 # Agent and editor artifacts
-.agent/
+.agent/*
+!.agent/instructions.md
 .DS_Store
 
 # Build outputs
