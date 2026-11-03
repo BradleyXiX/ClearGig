@@ -50,18 +50,18 @@ Things the spec implies but no task's tests cover by default. Each now has one t
 - Consumes: nothing
 - Produces: `npm run lint:design`, exit 0 clean, exit 1 on violations
 
-- [ ] **Step 1: Copy the script**
+- [x] **Step 1: Copy the script**
 
 ```powershell
 Copy-Item "..\..\Insight Scraper\scripts\design-lint.mjs" "scripts\design-lint.mjs"
 ```
 
-- [ ] **Step 2: Add the npm script, then run it**
+- [x] **Step 2: Add the npm script, then run it**
 
 Run: `node scripts/design-lint.mjs src`
 Expected: exit 1, baseline violations listed. Record the error count in the commit message.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add scripts/design-lint.mjs package.json
@@ -92,7 +92,7 @@ export interface Totals {
 export function computeTotals(project: Pick<Project, "lineItems" | "contingencyPercentage" | "profitMargin">): Totals;
 ```
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 // src/lib/totals.test.ts
@@ -132,23 +132,23 @@ test("empty project is all zeros", () => {
 });
 ```
 
-- [ ] **Step 2: Run it**
+- [x] **Step 2: Run it**
 
 Run: `npm test`
 Expected: FAIL, cannot find module `./totals.ts`
 
 > **Runtime note.** Node 26 is installed, so `node --test` strips TypeScript natively. Two rules follow and apply to every `*.test.ts` in this plan: relative imports must carry the `.ts` extension, and type-only imports must use `import type` (a plain `import { LineItem }` would survive stripping as a runtime binding and fail).
 
-- [ ] **Step 3: Implement `computeTotals` to the four assertions above**
+- [x] **Step 3: Implement `computeTotals` to the four assertions above**
 
 Signature and field names exactly as the Interfaces block. No rounding inside the module; format at render.
 
-- [ ] **Step 4: Run it**
+- [x] **Step 4: Run it**
 
 Run: `npm test`
 Expected: PASS, 4 tests
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/totals.ts src/lib/totals.test.ts package.json
@@ -175,7 +175,7 @@ export interface AuditResult {
 export function computeAudit(input: AuditInput): AuditResult;
 ```
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 import test from "node:test";
@@ -201,10 +201,10 @@ test("zero rate yields zero savings and full spend retained", () => {
 });
 ```
 
-- [ ] **Step 2: Run** `npm test` — expect FAIL, module missing
-- [ ] **Step 3: Implement** the five formulas from spec §6.7
-- [ ] **Step 4: Run** `npm test` — expect PASS
-- [ ] **Step 5: Commit** `feat(lib): add computeAudit with tests`
+- [x] **Step 2: Run** `npm test` — expect FAIL, module missing
+- [x] **Step 3: Implement** the five formulas from spec §6.7
+- [x] **Step 4: Run** `npm test` — expect PASS
+- [x] **Step 5: Commit** `feat(lib): add computeAudit with tests`
 
 ---
 
@@ -217,7 +217,7 @@ test("zero rate yields zero savings and full spend retained", () => {
 **Interfaces:**
 - Produces: `export function folio(project: Pick<Project, "id" | "createdAt">): string`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 import test from "node:test";
@@ -240,10 +240,10 @@ test("uses the UTC year, not the local one", () => {
 });
 ```
 
-- [ ] **Step 2: Run** `npm test` — FAIL
-- [ ] **Step 3: Implement** — `project.id.slice(0, 4).toUpperCase()` and `new Date(project.createdAt).getUTCFullYear()`. A local-time `getFullYear()` renders a different folio on the document than on screen for anyone east of UTC near New Year, so UTC is required, not stylistic.
-- [ ] **Step 4: Run** `npm test` — PASS
-- [ ] **Step 5: Commit** `feat(lib): add deterministic folio`
+- [x] **Step 2: Run** `npm test` — FAIL
+- [x] **Step 3: Implement** — `project.id.slice(0, 4).toUpperCase()` and `new Date(project.createdAt).getUTCFullYear()`. A local-time `getFullYear()` renders a different folio on the document than on screen for anyone east of UTC near New Year, so UTC is required, not stylistic.
+- [x] **Step 4: Run** `npm test` — PASS
+- [x] **Step 5: Commit** `feat(lib): add deterministic folio`
 
 ---
 
@@ -257,15 +257,15 @@ test("uses the UTC year, not the local one", () => {
 - Consumes: nothing
 - Produces: Tailwind utilities `bg-paper`, `bg-paper-raised`, `bg-paper-sunken`, `text-ink`, `text-ink-muted`, `border-rule`, `border-rule-strong`, `bg-accent`, `text-accent`, `bg-accent-wash`, `text-danger`, plus `--radius-card: 4px`, `--radius-control: 2px`, `--ease-ledger`.
 
-- [ ] **Step 1: Replace the token blocks** with the ten palette values from Global Constraints, mapped in `@theme inline` under the names listed above. Keep `@import "tailwindcss";` at the top. Also map `--radius-control: 2px` and `--radius-card: 4px` so components can use `rounded-control` and `rounded-card`; `rounded-[2px]` is an arbitrary value and the lint gate rejects it.
-- [ ] **Step 2: Delete `.glass`** and every rule referencing blur or gradient.
-- [ ] **Step 3: Add the print base** — `@page { size: letter portrait; margin: 18mm }` and `@media print { .no-print { display: none } }`. Nothing else; no global element hiding.
-- [ ] **Step 4: Verify**
+- [x] **Step 1: Replace the token blocks** with the ten palette values from Global Constraints, mapped in `@theme inline` under the names listed above. Keep `@import "tailwindcss";` at the top. Also map `--radius-control: 2px` and `--radius-card: 4px` so components can use `rounded-control` and `rounded-card`; `rounded-[2px]` is an arbitrary value and the lint gate rejects it.
+- [x] **Step 2: Delete `.glass`** and every rule referencing blur or gradient.
+- [x] **Step 3: Add the print base** — `@page { size: letter portrait; margin: 18mm }` and `@media print { .no-print { display: none } }`. Nothing else; no global element hiding.
+- [x] **Step 4: Verify**
 
 Run: `npm run build`
 Expected: PASS. Run `node scripts/design-lint.mjs src`. `globals.css` is the sanctioned home for raw palette values — the script exempts files named `globals`, `theme` or `tokens` from `hardcoded-hex` and `arbitrary-value` (`design-lint.mjs:70,76`), so the ten hex values belong here and nowhere else. Confirm instead that `hardcoded-hex` fires in **no other file**.
 
-- [ ] **Step 5: Commit** `feat(ui): add Ledger token layer`
+- [x] **Step 5: Commit** `feat(ui): add Ledger token layer`
 
 ---
 
@@ -300,9 +300,9 @@ type StampProps = { status: Project["status"] };
 
 Sizes: `md` is `px-3 py-2 text-sm font-semibold` (8px vertical, 12px horizontal per Global Constraints), `sm` is `px-2 py-1 text-sm font-medium`. Radius `2px` both. Hover changes color only, 150ms. Disabled is `opacity-50` with `cursor-not-allowed` and no hover change. No `hover:scale-*` on any variant.
 
-- [ ] **Step 1: Implement the five primitives** using only tokens, against the variant table above. Every button gets `focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent`.
-- [ ] **Step 2: Verify** `npx tsc --noEmit` and `npm run build`.
-- [ ] **Step 3: Commit** `feat(ui): add Ledger primitives`
+- [x] **Step 1: Implement the five primitives** using only tokens, against the variant table above. Every button gets `focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent`.
+- [x] **Step 2: Verify** `npx tsc --noEmit` and `npm run build`.
+- [x] **Step 3: Commit** `feat(ui): add Ledger primitives`
 
 ---
 
@@ -316,17 +316,17 @@ Sizes: `md` is `px-3 py-2 text-sm font-semibold` (8px vertical, 12px horizontal 
 **Interfaces:**
 - Produces: `<BrandBar />` in the shell; `layout.tsx` exports the same `metadata`.
 
-- [ ] **Step 1: Rewrite `layout.tsx`** — `<html>` with Geist variables, `<body className="min-h-dvh bg-paper text-ink">`, `<BrandBar />`, `<main>{children}</main>`. No `cursor-none`, no canvas, no provider.
-- [ ] **Step 2: Create `src/components/BrandBar.tsx`** — wordmark left, "New estimate" primary button right, nothing floating. Current route marked with `--accent` underline via `usePathname`.
-- [ ] **Step 3: Delete the three components and the six dependencies**, then `npm install`.
-- [ ] **Step 4: Verify**
+- [x] **Step 1: Rewrite `layout.tsx`** — `<html>` with Geist variables, `<body className="min-h-dvh bg-paper text-ink">`, `<BrandBar />`, `<main>{children}</main>`. No `cursor-none`, no canvas, no provider.
+- [x] **Step 2: Create `src/components/BrandBar.tsx`** — wordmark left, "New estimate" primary button right, nothing floating. Current route marked with `--accent` underline via `usePathname`.
+- [x] **Step 3: Delete the three components and the six dependencies**, then `npm install`.
+- [x] **Step 4: Verify**
 
 ```powershell
 Select-String -Path src\**\*.tsx,src\**\*.css -Pattern "cursor-none|Lenis|three|gsap|blur-3xl|scale-\[4\]"
 ```
 Expected: no matches. Then `npm run build` PASS.
 
-- [ ] **Step 5: Commit** `refactor(ui): remove cursor, canvas and smooth scroll`
+- [x] **Step 5: Commit** `refactor(ui): remove cursor, canvas and smooth scroll`
 
 ---
 
@@ -340,12 +340,12 @@ Expected: no matches. Then `npm run build` PASS.
 - Consumes: `computeTotals`, `Stamp`
 - Produces: route `/dashboard` — the app home
 
-- [ ] **Step 1: Rewrite the page** as a `Rule`-separated ledger: columns Description | Client | Status | Total | Updated. Row height 48px, numerals `font-mono tabular-nums`. Row click `router.push('/projects/' + p.id)`.
-- [ ] **Step 2: Replace the drawer entirely** — delete `renderProjectDetails`, the backdrop, the blur and the `body.overflow` effect.
-- [ ] **Step 3: Client totals rail** — a plain table using `computeTotals` per project, summing by client. This fixes the compounding bug; delete the old `rev += rev * (p.contingencyPercentage / 100)` loop.
-- [ ] **Step 4: Loading state** — six skeleton rows at 48px with `bg-paper-sunken`, no spinner, no "Loading...".
-- [ ] **Step 5: Verify** `npm run build`, `npm run lint:design`.
-- [ ] **Step 6: Commit** `feat(dashboard): rebuild as estimates ledger`
+- [x] **Step 1: Rewrite the page** as a `Rule`-separated ledger: columns Description | Client | Status | Total | Updated. Row height 48px, numerals `font-mono tabular-nums`. Row click `router.push('/projects/' + p.id)`.
+- [x] **Step 2: Replace the drawer entirely** — delete `renderProjectDetails`, the backdrop, the blur and the `body.overflow` effect.
+- [x] **Step 3: Client totals rail** — a plain table using `computeTotals` per project, summing by client. This fixes the compounding bug; delete the old `rev += rev * (p.contingencyPercentage / 100)` loop.
+- [x] **Step 4: Loading state** — six skeleton rows at 48px with `bg-paper-sunken`, no spinner, no "Loading...".
+- [x] **Step 5: Verify** `npm run build`, `npm run lint:design`.
+- [x] **Step 6: Commit** `feat(dashboard): rebuild as estimates ledger`
 
 ---
 
@@ -360,15 +360,15 @@ Expected: no matches. Then `npm run build` PASS.
 - Consumes: `computeTotals`, `folio`, `Stamp`, primitives
 - Produces: `EstimateSummary({ totals, contingencyPercentage, profitMargin, onExport })`
 
-- [ ] **Step 1: Two-column layout** — ledger and add-item form left, summary rail right. Max width 1280px.
-- [ ] **Step 2: Replace both range sliders** with `Field` numeric inputs showing the unit outside the field, `step="1"`, `min="0"`, `max="100"`.
-- [ ] **Step 3: Replace the status `<select>`** with `<Stamp>` plus a menu.
-- [ ] **Step 4: Inline delete confirm** — the row's delete button becomes a two-step inline confirm. Delete `window.confirm`.
-- [ ] **Step 5: Save semantics** — explicit Save, disabled until dirty, `isLocked` keeps hiding add-item and row delete.
-- [ ] **Step 6: Add a two-item switch** under the title: Estimate | FinOps audit. This task wires only the Estimate branch, rendering `EstimateSummary`. The audit tab renders `disabled` with `aria-disabled` and no handler until Task 10 creates `FinOpsAudit`; this keeps `npm run build` green at the end of this task instead of depending on a file that does not exist yet.
-- [ ] **Step 7: Remove every `dark:` class and light-mode pastel** in this file and in `LineItemTable.tsx`.
-- [ ] **Step 8: Verify** `npm run build`, `npm run lint:design`; grep for `dark:` returns nothing.
-- [ ] **Step 9: Commit** `feat(project): rebuild estimate detail`
+- [x] **Step 1: Two-column layout** — ledger and add-item form left, summary rail right. Max width 1280px.
+- [x] **Step 2: Replace both range sliders** with `Field` numeric inputs showing the unit outside the field, `step="1"`, `min="0"`, `max="100"`.
+- [x] **Step 3: Replace the status `<select>`** with `<Stamp>` plus a menu.
+- [x] **Step 4: Inline delete confirm** — the row's delete button becomes a two-step inline confirm. Delete `window.confirm`.
+- [x] **Step 5: Save semantics** — explicit Save, disabled until dirty, `isLocked` keeps hiding add-item and row delete.
+- [x] **Step 6: Add a two-item switch** under the title: Estimate | FinOps audit. This task wires only the Estimate branch, rendering `EstimateSummary`. The audit tab renders `disabled` with `aria-disabled` and no handler until Task 10 creates `FinOpsAudit`; this keeps `npm run build` green at the end of this task instead of depending on a file that does not exist yet.
+- [x] **Step 7: Remove every `dark:` class and light-mode pastel** in this file and in `LineItemTable.tsx`.
+- [x] **Step 8: Verify** `npm run build`, `npm run lint:design`; grep for `dark:` returns nothing.
+- [x] **Step 9: Commit** `feat(project): rebuild estimate detail`
 
 ---
 
@@ -387,12 +387,12 @@ lands, so the delete is the last step and the build must pass without it.
 - Consumes: `computeAudit`, primitives
 - Produces: `FinOpsAudit({ defaultMonthlySpend }: { defaultMonthlySpend: number })`
 
-- [ ] **Step 1: Build the surface** with two `Field` inputs (monthly spend, target rate), a five-row ruled results table, and a terms block reading "Fee: 50% of the first three months of savings".
-- [ ] **Step 2: No badge, no sparkles, no primary-tinted panel, no Venture #9 pill.** Accent appears only on the net-savings figure.
-- [ ] **Step 3: Delete `SummaryPanel.tsx`.** Its print block (`SummaryPanel.tsx:87-119`), the `isFinOpsMode` toggle, the Venture #9 strings and the guarantee panel go with the file. Also delete every `@media print` rule living inside a component; print styling belongs to `globals.css` and Task 11 only.
-- [ ] **Step 4: Prove the file is unreferenced** — `Select-String -Path src\**\*.tsx -Pattern "SummaryPanel"` returns no matches, then `npm run build` passes without the file.
-- [ ] **Step 5: Verify** `npm test` (finops cases pass), `npm run build`, `npm run lint:design`.
-- [ ] **Step 6: Commit** `feat(finops): rebuild audit surface and delete SummaryPanel`
+- [x] **Step 1: Build the surface** with two `Field` inputs (monthly spend, target rate), a five-row ruled results table, and a terms block reading "Fee: 50% of the first three months of savings".
+- [x] **Step 2: No badge, no sparkles, no primary-tinted panel, no Venture #9 pill.** Accent appears only on the net-savings figure.
+- [x] **Step 3: Delete `SummaryPanel.tsx`.** Its print block (`SummaryPanel.tsx:87-119`), the `isFinOpsMode` toggle, the Venture #9 strings and the guarantee panel go with the file. Also delete every `@media print` rule living inside a component; print styling belongs to `globals.css` and Task 11 only.
+- [x] **Step 4: Prove the file is unreferenced** — `Select-String -Path src\**\*.tsx -Pattern "SummaryPanel"` returns no matches, then `npm run build` passes without the file.
+- [x] **Step 5: Verify** `npm test` (finops cases pass), `npm run build`, `npm run lint:design`.
+- [x] **Step 6: Commit** `feat(finops): rebuild audit surface and delete SummaryPanel`
 
 ---
 
@@ -408,14 +408,14 @@ lands, so the delete is the last step and the build must pass without it.
 - Consumes: `computeTotals`, `computeAudit`, `folio`, `api.getProjectById`
 - Produces: `/projects/[id]/document` and `/projects/[id]/document?variant=audit`; `DocumentShell({ folioNumber, title, clientName, children })`
 
-- [ ] **Step 1: `DocumentShell`** — folio and date top right in label style, title and client left, children body, 192px rule plus "Authorized signature" at the bottom. The prop is `folioNumber`, deliberately not `folio`, so it does not shadow the `folio()` helper imported into the same tree.
-- [ ] **Step 2: The route fetches its own data** — `api.getProjectById(id)`, guarded like the detail page. While loading, render the shell with ruled skeleton rows; on 404 render "This estimate does not exist." with a link to `/dashboard`. No `window.print()` anywhere in this step.
-- [ ] **Step 3: `DocumentEstimate`** — ruled line items, `--rule-strong` above totals, total `text-5xl` `--accent`.
-- [ ] **Step 4: `DocumentAudit`** — the five FinOps values, the terms block. Monthly spend seeds from the project's recurring total, else 12500, matching the spec default.
-- [ ] **Step 5: `?variant=audit`** selects `DocumentAudit`; default is `DocumentEstimate`. Unknown variant falls back to estimate.
-- [ ] **Step 6: `onExport` opens the document route in a new tab.** The document page renders the artifact plus a visible `Print` button (`variant="primary"`, class `no-print`) that calls `window.print()`. **Nothing auto-prints on mount** — a `useEffect(() => window.print())` is explicitly forbidden, because it fires the OS dialog before the client has read the document and it double-fires under React 19 StrictMode in dev. The user reads, then prints.
-- [ ] **Step 7: Verify print** — in the browser, print preview at Letter shows one page, no nav, no buttons, all five audit values.
-- [ ] **Step 8: Commit** `feat(document): add printable estimate and audit`
+- [x] **Step 1: `DocumentShell`** — folio and date top right in label style, title and client left, children body, 192px rule plus "Authorized signature" at the bottom. The prop is `folioNumber`, deliberately not `folio`, so it does not shadow the `folio()` helper imported into the same tree.
+- [x] **Step 2: The route fetches its own data** — `api.getProjectById(id)`, guarded like the detail page. While loading, render the shell with ruled skeleton rows; on 404 render "This estimate does not exist." with a link to `/dashboard`. No `window.print()` anywhere in this step.
+- [x] **Step 3: `DocumentEstimate`** — ruled line items, `--rule-strong` above totals, total `text-5xl` `--accent`.
+- [x] **Step 4: `DocumentAudit`** — the five FinOps values, the terms block. Monthly spend seeds from the project's recurring total, else 12500, matching the spec default.
+- [x] **Step 5: `?variant=audit`** selects `DocumentAudit`; default is `DocumentEstimate`. Unknown variant falls back to estimate.
+- [x] **Step 6: `onExport` opens the document route in a new tab.** The document page renders the artifact plus a visible `Print` button (`variant="primary"`, class `no-print`) that calls `window.print()`. **Nothing auto-prints on mount** — a `useEffect(() => window.print())` is explicitly forbidden, because it fires the OS dialog before the client has read the document and it double-fires under React 19 StrictMode in dev. The user reads, then prints.
+- [x] **Step 7: Verify print** — in the browser, print preview at Letter shows one page, no nav, no buttons, all five audit values.
+- [x] **Step 8: Commit** `feat(document): add printable estimate and audit`
 
 ---
 
@@ -462,7 +462,7 @@ Two rules the module enforces so they cannot be skipped in the component:
 - A category with `0` hours is **not** written as a line item. A zero row would print as `$0` on the document. Both zero is an error.
 - If `createProject` throws after a client was created, the rejection is a `SaveEstimateError` carrying `clientId` and `clientName`, so the wizard can name the orphaned client instead of losing it.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 // src/lib/save-estimate.test.ts
@@ -540,14 +540,14 @@ test("project failure with an existing client orphans nothing", async () => {
 });
 ```
 
-- [ ] **Step 2: Run** `npm test` — expect FAIL, module missing
-- [ ] **Step 3: Implement** `saveEstimate` to the seven assertions. It takes deps as a parameter; it does **not** import `api` directly, so the test needs no mocking library.
-- [ ] **Step 4: Run** `npm test` — expect PASS, 7 tests
-- [ ] **Step 5: Commit** `feat(lib): add saveEstimate with orphan-client coverage`
-- [ ] **Step 6: Rewrite the wizard as five steps, one column** — client, title, hours plus shared rate, review, saved document. No absolute positioning, no `scale`, no `blur`, no `overflow: hidden`. Progress rule across the top reading "1 of 5".
-- [ ] **Step 7: Step 1 is a combobox** — existing clients from `getClients()` or a new name. Selecting an existing client sets `clientId` and skips `createClient`.
-- [ ] **Step 8: Rate field** on step 3, prefilled from `localStorage.getItem("cleargig.rate") ?? "150"`, written back on save.
-- [ ] **Step 9: Persist by calling `saveEstimate`.** Wire `deps` with three adapters — the real API uses objects and snake_case, and `save-estimate` uses positional/named arguments:
+- [x] **Step 2: Run** `npm test` — expect FAIL, module missing
+- [x] **Step 3: Implement** `saveEstimate` to the seven assertions. It takes deps as a parameter; it does **not** import `api` directly, so the test needs no mocking library.
+- [x] **Step 4: Run** `npm test` — expect PASS, 7 tests
+- [x] **Step 5: Commit** `feat(lib): add saveEstimate with orphan-client coverage`
+- [x] **Step 6: Rewrite the wizard as five steps, one column** — client, title, hours plus shared rate, review, saved document. No absolute positioning, no `scale`, no `blur`, no `overflow: hidden`. Progress rule across the top reading "1 of 5".
+- [x] **Step 7: Step 1 is a combobox** — existing clients from `getClients()` or a new name. Selecting an existing client sets `clientId` and skips `createClient`.
+- [x] **Step 8: Rate field** on step 3, prefilled from `localStorage.getItem("cleargig.rate") ?? "150"`, written back on save.
+- [x] **Step 9: Persist by calling `saveEstimate`.** Wire `deps` with three adapters — the real API uses objects and snake_case, and `save-estimate` uses positional/named arguments:
 
 ```ts
 const deps: SaveDeps = {
@@ -570,11 +570,11 @@ const deps: SaveDeps = {
 
 Pass `contingencyPercentage: 15` and `profitMargin: 0`. On success `router.push('/projects/' + projectId)`. `tsc` catches it if the adapters are skipped and the raw `api` methods are wired instead, because the signatures differ.
 
-- [ ] **Step 10: Failure handling** — catch `SaveEstimateError` and render its message inline in `--danger`. If it carries a `clientId`, the message must name the client and state that the client was saved but the estimate was not.
-- [ ] **Step 11: Keyboard** — Enter advances, Shift+Enter goes back, Escape returns to `/dashboard` after confirm when dirty.
-- [ ] **Step 12: Delete** the fake `invoiceId`, the `scanner-line`, and the dead Export button on this page.
-- [ ] **Step 13: Verify** — create an estimate end to end against the local API; confirm it appears on `/dashboard` and opens at `/projects/[id]`. Then create a second estimate for the same client and confirm no duplicate client row appears on `/dashboard`.
-- [ ] **Step 14: Commit** `feat(wizard): persist estimates through the API`
+- [x] **Step 10: Failure handling** — catch `SaveEstimateError` and render its message inline in `--danger`. If it carries a `clientId`, the message must name the client and state that the client was saved but the estimate was not.
+- [x] **Step 11: Keyboard** — Enter advances, Shift+Enter goes back, Escape returns to `/dashboard` after confirm when dirty.
+- [x] **Step 12: Delete** the fake `invoiceId`, the `scanner-line`, and the dead Export button on this page.
+- [x] **Step 13: Verify** — create an estimate end to end against the local API; confirm it appears on `/dashboard` and opens at `/projects/[id]`. Then create a second estimate for the same client and confirm no duplicate client row appears on `/dashboard`.
+- [x] **Step 14: Commit** `feat(wizard): persist estimates through the API`
 
 ---
 
@@ -584,10 +584,10 @@ Pass `contingencyPercentage: 15` and `profitMargin: 0`. On success `router.push(
 - Modify: `frontend/src/app/projects/[id]/page.tsx` — every `href="/"` and every `router.push('/')` becomes `/dashboard`
 - Rewrite: `ClearGig/.agent/instructions.md`
 
-- [ ] **Step 1: Repoint redirects** — "Back to dashboard", the not-found link, and post-delete all target `/dashboard`.
-- [ ] **Step 2: Rewrite `.agent/instructions.md`** to state that the Ledger spec at `docs/superpowers/specs/2026-11-03-cleargig-ledger-design.md` is authoritative, and that Lenis, GSAP, three.js, glassmorphism and the custom cursor are explicitly out of scope. Remove the `npm install gsap` instruction.
-- [ ] **Step 3: Verify** — grep for `href="/"` in `src/app/projects` returns nothing.
-- [ ] **Step 4: Commit** `fix(nav): point redirects at the dashboard`
+- [x] **Step 1: Repoint redirects** — "Back to dashboard", the not-found link, and post-delete all target `/dashboard`.
+- [x] **Step 2: Rewrite `.agent/instructions.md`** to state that the Ledger spec at `docs/superpowers/specs/2026-11-03-cleargig-ledger-design.md` is authoritative, and that Lenis, GSAP, three.js, glassmorphism and the custom cursor are explicitly out of scope. Remove the `npm install gsap` instruction.
+- [x] **Step 3: Verify** — grep for `href="/"` in `src/app/projects` returns nothing.
+- [x] **Step 4: Commit** `fix(nav): point redirects at the dashboard`
 
 ---
 
@@ -595,7 +595,7 @@ Pass `contingencyPercentage: 15` and `profitMargin: 0`. On success `router.push(
 
 **Files:** none
 
-- [ ] **Step 1: Gates**
+- [x] **Step 1: Gates**
 
 ```powershell
 npx tsc --noEmit
@@ -605,17 +605,17 @@ npm run lint:design
 ```
 Expected: all exit 0.
 
-- [ ] **Step 2: Grep the forbidden strings**
+- [x] **Step 2: Grep the forbidden strings**
 
 ```powershell
 Select-String -Path src\**\*.tsx,src\**\*.css -Pattern "cursor-none|blur-3xl|scale-\[4\]|bg-gradient|dark:|transition-all|ease-in-out"
 ```
 Expected: no matches.
 
-- [ ] **Step 3: Responsive check** at 390×844 on `/`, `/dashboard`, `/projects/[id]`, `/projects/[id]/document` — no horizontal overflow, primary action above the fold.
-- [ ] **Step 4: Keyboard check** — complete an estimate without a mouse; every focus stop visible.
-- [ ] **Step 5: Print check** — both document variants, one Letter page each.
-- [ ] **Step 6: Record the run** — tick the boxes in this plan file and commit it. The acceptance run changes no source code, so there is nothing else to commit; an `--allow-empty` commit is not the goal.
+- [x] **Step 3: Responsive check** at 390×844 on `/`, `/dashboard`, `/projects/[id]`, `/projects/[id]/document` — no horizontal overflow, primary action above the fold.
+- [x] **Step 4: Keyboard check** — complete an estimate without a mouse; every focus stop visible.
+- [x] **Step 5: Print check** — both document variants, one Letter page each.
+- [x] **Step 6: Record the run** — tick the boxes in this plan file and commit it. The acceptance run changes no source code, so there is nothing else to commit; an `--allow-empty` commit is not the goal.
 
 ```bash
 git add docs/superpowers/plans/2026-11-03-cleargig-ledger.md
