@@ -11,11 +11,11 @@ export interface Totals {
 export function computeTotals(
   project: Pick<Project, "lineItems" | "contingencyPercentage" | "profitMargin">
 ): Totals {
-  const lineItems = project.lineItems ?? [];
+  const items = project.lineItems ?? [];
   let base = 0;
   let recurringMonthly = 0;
 
-  for (const item of lineItems) {
+  for (const item of items) {
     const cost = item.estimatedHours * item.hourlyRate;
     if (item.isRecurring) {
       recurringMonthly += cost;
@@ -24,8 +24,8 @@ export function computeTotals(
     }
   }
 
-  const contingency = base * (project.contingencyPercentage / 100);
-  const margin = (base + contingency) * (project.profitMargin / 100);
+  const contingency = base * ((project.contingencyPercentage ?? 0) / 100);
+  const margin = (base + contingency) * ((project.profitMargin ?? 0) / 100);
   const total = base + contingency + margin;
 
   return {
@@ -36,3 +36,4 @@ export function computeTotals(
     recurringMonthly,
   };
 }
+

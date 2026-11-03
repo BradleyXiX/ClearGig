@@ -1,3 +1,4 @@
+// src/lib/totals.test.ts
 import test from "node:test";
 import assert from "node:assert/strict";
 import { computeTotals } from "./totals.ts";
@@ -32,3 +33,4 @@ test("empty project is all zeros", () => {
   const t = computeTotals({ contingencyPercentage: 15, profitMargin: 10, lineItems: [] });
   assert.deepEqual(t, { base: 0, contingency: 0, margin: 0, total: 0, recurringMonthly: 0 });
 });
+
