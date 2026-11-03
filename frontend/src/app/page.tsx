@@ -75,7 +75,7 @@ export default function WizardPage() {
       router.push('/projects/' + res.projectId);
     } catch (err: unknown) {
       if (err instanceof SaveEstimateError) {
-        setSaveError(err.message);
+        setSaveError(err.clientId ? `Client "${err.clientName}" was saved, but the estimate was not: ${err.message}` : err.message);
       } else {
         setSaveError(err instanceof Error ? err.message : 'Failed to save estimate');
       }
@@ -154,9 +154,7 @@ export default function WizardPage() {
             <datalist id="wizard-clients">
               {existingClients.map((c) => <option key={c.id} value={c.name} />)}
             </datalist>
-            {selectedClientId && (
-              <span className="text-xs font-mono text-accent">Existing client selected</span>
-            )}
+            {selectedClientId && <span className="text-xs font-mono text-accent">Existing client selected</span>}
           </div>
           <div className="flex justify-between items-center pt-4">
             <Button variant="quiet" onClick={() => isDirty ? setConfirmDiscard(true) : router.push('/dashboard')}>Cancel</Button>
