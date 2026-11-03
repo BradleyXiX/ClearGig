@@ -3,26 +3,34 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Save, Plus, Trash2 } from 'lucide-react';
-import { api, Project } from '../../../services/api';
-import LineItemTable from '../../../components/LineItemTable';
-import SummaryPanel from '../../../components/SummaryPanel';
+import { api, type Project } from '@/services/api';
+import { computeTotals } from '@/lib/totals';
+import { folio } from '@/lib/folio';
+import { Stamp } from '@/components/ui/Stamp';
+import { Button } from '@/components/ui/Button';
+import { Field } from '@/components/ui/Field';
+import LineItemTable from '@/components/LineItemTable';
+import { EstimateSummary } from '@/components/EstimateSummary';
+import { FinOpsAudit } from '@/components/FinOpsAudit';
 
 export default function ProjectDetail() {
   const { id } = useParams() as { id: string };
   const router = useRouter();
-  
+
   const [project, setProject] = useState<Project | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  
-  // Local state for global toggles
+  const [statusMenuOpen, setStatusMenuOpen] = useState(false);
+  const [confirmDeleteProject, setConfirmDeleteProject] = useState(false);
+  const [activeTab, setActiveTab] = useState<'estimate' | 'audit'>('estimate');
+
+  // Local state for editable settings
   const [contingencyPercentage, setContingencyPercentage] = useState(0);
   const [profitMargin, setProfitMargin] = useState(0);
   const [status, setStatus] = useState<Project['status']>('DRAFT');
-  
-  // Local state for UI form
-  const [category, setCategory] = useState('FRONTEND');
+
+  // Add line item form state
+  const [category, setCategory] = useState<'FRONTEND' | 'BACKEND' | 'CLOUD' | 'MAINTENANCE'>('FRONTEND');
   const [description, setDescription] = useState('');
   const [estimatedHours, setEstimatedHours] = useState('');
   const [hourlyRate, setHourlyRate] = useState('');
@@ -43,9 +51,7 @@ export default function ProjectDetail() {
   };
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadProject();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const handleAddLineItem = async (e: React.FormEvent) => {
@@ -58,16 +64,13 @@ export default function ProjectDetail() {
         description,
         estimated_hours: Number(estimatedHours),
         hourly_rate: Number(hourlyRate),
-        is_recurring: isRecurring
+        is_recurring: isRecurring,
       });
-      
-      // Reset form
+
       setDescription('');
       setEstimatedHours('');
       setHourlyRate('');
       setIsRecurring(false);
-      
-      // Reload project to get updated items
       loadProject();
     } catch (error) {
       console.error('Error adding line item:', error);
@@ -82,7 +85,6 @@ export default function ProjectDetail() {
         profit_margin: profitMargin,
         status: status,
       });
-      // Optionally reload to ensure sync, though we have local state
       await loadProject();
     } catch (error) {
       console.error('Error saving project:', error);
@@ -101,218 +103,342 @@ export default function ProjectDetail() {
   };
 
   const handleDeleteProject = async () => {
-    if (!window.confirm('Are you sure you want to delete this project? This action cannot be undone.')) return;
-    
     try {
       await api.deleteProject(id);
-      router.push('/');
+      router.push('/dashboard');
     } catch (error) {
       console.error('Error deleting project:', error);
     }
   };
 
-  if (isLoading) {
-    return <div className="min-h-screen p-8 flex items-center justify-center text-muted-foreground">Loading estimate details...</div>;
-  }
+  const handleExportEstimate = () => {
+    window.open(`/projects/${id}/document`, '_blank');
+  };
 
-  if (!project) {
+  const handleExportAudit = () => {
+    window.open(`/projects/${id}/document?variant=audit`, '_blank');
+  };
+
+  if (isLoading) {
     return (
-      <div className="min-h-screen p-8 text-center">
-        <h2 className="text-2xl font-bold mb-4">Project not found</h2>
-        <Link href="/" className="text-primary hover:underline">Return to Dashboard</Link>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12">
+        <div className="space-y-4">
+          <div className="h-8 w-48 bg-paper-sunken animate-pulse rounded-control" />
+          <div className="h-64 bg-paper-sunken animate-pulse rounded-card" />
+        </div>
       </div>
     );
   }
 
-  // Calculate costs
-  const baseCost = project.lineItems?.filter(i => !i.isRecurring).reduce((sum, item) => sum + (Number(item.estimatedHours) * Number(item.hourlyRate)), 0) || 0;
-  const recurringCost = project.lineItems?.filter(i => i.isRecurring).reduce((sum, item) => sum + (Number(item.estimatedHours) * Number(item.hourlyRate)), 0) || 0;
+  if (!project) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12 text-center">
+        <h2 className="text-2xl font-semibold mb-4 text-ink">Estimate not found</h2>
+        <Link href="/dashboard" className="text-sm font-medium text-accent hover:underline">
+          Return to dashboard
+        </Link>
+      </div>
+    );
+  }
 
   const isLocked = status !== 'DRAFT';
+  const isDirty =
+    contingencyPercentage !== (Number(project.contingencyPercentage) || 0) ||
+    profitMargin !== (Number(project.profitMargin) || 0) ||
+    status !== project.status;
+
+  const currentTotals = computeTotals({
+    lineItems: project.lineItems,
+    contingencyPercentage,
+    profitMargin,
+  });
+
+  const folioNumber = folio(project);
 
   return (
-    <div className="min-h-screen p-8 max-w-7xl mx-auto">
-      <header className="mb-8">
-        <Link href="/" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-6">
-          <ArrowLeft className="w-4 h-4" />
-          Back to Dashboard
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+      {/* Header */}
+      <div className="mb-6">
+        <Link
+          href="/dashboard"
+          className="text-xs font-medium uppercase tracking-wider text-ink-muted hover:text-ink transition-colors duration-150 inline-block mb-4"
+        >
+          ← Back to dashboard
         </Link>
-        
-        <div className="flex justify-between items-start">
+
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-foreground">{project.title}</h1>
-            <p className="text-muted-foreground mt-1">Client ID: {project.clientId}</p>
+            <div className="flex items-center gap-3 mb-1">
+              <span className="font-mono text-xs uppercase tracking-wider text-ink-muted">
+                {folioNumber}
+              </span>
+              <span className="text-ink-muted">•</span>
+              <span className="text-xs uppercase tracking-wider text-ink-muted">
+                {project.client?.name ?? 'Unknown client'}
+              </span>
+            </div>
+            <h1 className="text-4xl font-semibold tracking-tight text-ink">
+              {project.title}
+            </h1>
           </div>
+
           <div className="flex items-center gap-3">
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value as Project['status'])}
-              className="bg-secondary text-secondary-foreground border border-border rounded-md text-sm font-medium px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/50 cursor-pointer"
-            >
-              <option value="DRAFT">DRAFT</option>
-              <option value="SENT">SENT</option>
-              <option value="ACCEPTED">ACCEPTED</option>
-              <option value="REJECTED">REJECTED</option>
-            </select>
-            <button 
+            {/* Status Stamp with dropdown menu */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setStatusMenuOpen(!statusMenuOpen)}
+                className="p-1 rounded-control hover:bg-paper-sunken transition-colors duration-150"
+                title="Change status"
+              >
+                <Stamp status={status} />
+              </button>
+              {statusMenuOpen && (
+                <div className="absolute right-0 mt-1 z-30 bg-paper-raised border border-rule rounded-card p-1 flex flex-col gap-1 min-w-32">
+                  {(['DRAFT', 'SENT', 'ACCEPTED', 'REJECTED'] as const).map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => {
+                        setStatus(s);
+                        setStatusMenuOpen(false);
+                      }}
+                      className="px-3 py-1.5 text-left text-xs uppercase tracking-wider text-ink hover:bg-paper-sunken rounded-control transition-colors duration-150"
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <Button
+              variant="primary"
+              size="md"
               onClick={handleSaveProject}
-              disabled={isSaving}
-              className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 shadow-sm disabled:opacity-70"
+              disabled={!isDirty || isSaving}
             >
-              <Save className="w-4 h-4" />
-              {isSaving ? 'Saving...' : 'Save Estimate'}
-            </button>
+              {isSaving ? 'Saving...' : 'Save'}
+            </Button>
           </div>
         </div>
-      </header>
 
+        {/* Two-item switch under title: Estimate | FinOps audit */}
+        <div className="flex items-center gap-6 border-b border-rule mt-6">
+          <button
+            type="button"
+            onClick={() => setActiveTab('estimate')}
+            className={`py-2 border-b-2 text-sm transition-colors duration-150 ${
+              activeTab === 'estimate'
+                ? 'border-accent text-ink font-medium'
+                : 'border-transparent text-ink-muted hover:text-ink'
+            }`}
+          >
+            Estimate
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('audit')}
+            className={`py-2 border-b-2 text-sm transition-colors duration-150 ${
+              activeTab === 'audit'
+                ? 'border-accent text-ink font-medium'
+                : 'border-transparent text-ink-muted hover:text-ink'
+            }`}
+          >
+            FinOps audit
+          </button>
+        </div>
+      </div>
+
+      {/* Two-column layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Left Column */}
         <div className="lg:col-span-2 space-y-8">
-          {/* Add Line Item Form */}
-          {isLocked ? (
-            <div className="bg-card/50 border border-border rounded-xl p-8 shadow-sm flex flex-col items-center justify-center text-center">
-              <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center mb-4">
-                <Save className="w-6 h-6 text-muted-foreground" />
+          {activeTab === 'estimate' ? (
+            <>
+              {/* Add Line Item Form (hidden when locked) */}
+              {isLocked ? (
+                <div className="border border-rule rounded-card bg-paper-sunken p-6 text-center">
+                  <p className="text-sm text-ink-muted">
+                    Estimate is locked ({status}). Switch status back to DRAFT to add or remove items.
+                  </p>
+                </div>
+              ) : (
+                <div className="border border-rule rounded-card bg-paper-raised p-6">
+                  <h2 className="text-xs font-medium uppercase tracking-wider text-ink-muted mb-4">
+                    Add line item
+                  </h2>
+                  <form onSubmit={handleAddLineItem} className="space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-xs font-medium uppercase tracking-wider text-ink-muted block mb-1">
+                          Category
+                        </label>
+                        <select
+                          value={category}
+                          onChange={(e) => setCategory(e.target.value as typeof category)}
+                          className="w-full bg-paper-raised text-ink border border-rule rounded-control px-3 py-2 text-sm focus:outline-none focus:border-accent"
+                        >
+                          <option value="FRONTEND">Frontend</option>
+                          <option value="BACKEND">Backend</option>
+                          <option value="CLOUD">Cloud</option>
+                          <option value="MAINTENANCE">Maintenance</option>
+                        </select>
+                      </div>
+                      <div>
+                        <Field
+                          label="Description"
+                          type="text"
+                          placeholder="Scope module description"
+                          value={description}
+                          onChange={(e) => setDescription(e.target.value)}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Field
+                          label="Estimated hours"
+                          type="number"
+                          step="0.5"
+                          min="0"
+                          suffix="hrs"
+                          value={estimatedHours}
+                          onChange={(e) => setEstimatedHours(e.target.value)}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Field
+                          label="Hourly rate"
+                          type="number"
+                          step="1"
+                          min="0"
+                          suffix="$/hr"
+                          value={hourlyRate}
+                          onChange={(e) => setHourlyRate(e.target.value)}
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2 border-t border-rule">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={isRecurring}
+                          onChange={(e) => setIsRecurring(e.target.checked)}
+                          className="accent-accent w-4 h-4 rounded-control"
+                        />
+                        <span className="text-xs uppercase tracking-wider text-ink">
+                          Recurring monthly cost
+                        </span>
+                      </label>
+                      <Button variant="secondary" size="sm" type="submit">
+                        Add item
+                      </Button>
+                    </div>
+                  </form>
+                </div>
+              )}
+
+              {/* Line items ledger */}
+              <div className="border border-rule rounded-card bg-paper-raised p-6">
+                <h2 className="text-xs font-medium uppercase tracking-wider text-ink-muted mb-4">
+                  Line items ledger
+                </h2>
+                <LineItemTable
+                  items={project.lineItems || []}
+                  onDelete={handleDeleteLineItem}
+                  isLocked={isLocked}
+                />
               </div>
-              <h2 className="text-lg font-semibold text-foreground">Estimate is Locked</h2>
-              <p className="text-muted-foreground mt-1 max-w-sm">This project is currently marked as <span className="font-semibold">{status}</span>. Change the status back to DRAFT to add more line items.</p>
-            </div>
+            </>
           ) : (
-            <div className="bg-card border border-border rounded-xl p-6 shadow-sm glass">
-              <h2 className="text-lg font-semibold mb-4 text-foreground">Add Line Item</h2>
-              <form onSubmit={handleAddLineItem} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-muted-foreground mb-1">Category</label>
-                    <select 
-                      value={category} 
-                      onChange={(e) => setCategory(e.target.value)}
-                      className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                    >
-                      <option value="FRONTEND">Frontend</option>
-                      <option value="BACKEND">Backend</option>
-                      <option value="CLOUD">Cloud/DevOps</option>
-                      <option value="MAINTENANCE">Maintenance</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-muted-foreground mb-1">Description</label>
-                    <input 
-                      type="text" 
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      placeholder="e.g., Set up authentication"
-                      required
-                      className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-muted-foreground mb-1">Estimated Hours</label>
-                    <input 
-                      type="number" 
-                      min="0" step="0.5"
-                      value={estimatedHours}
-                      onChange={(e) => setEstimatedHours(e.target.value)}
-                      required
-                      className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-muted-foreground mb-1">Hourly Rate ($)</label>
-                    <input 
-                      type="number" 
-                      min="0"
-                      value={hourlyRate}
-                      onChange={(e) => setHourlyRate(e.target.value)}
-                      required
-                      className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                    />
-                  </div>
-                </div>
-                <div className="flex items-center justify-between pt-2 border-t border-border mt-4">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input 
-                      type="checkbox" 
-                      checked={isRecurring}
-                      onChange={(e) => setIsRecurring(e.target.checked)}
-                      className="rounded border-border text-primary focus:ring-primary w-4 h-4"
-                    />
-                    <span className="text-sm font-medium text-foreground">Recurring Monthly Cost</span>
-                  </label>
-                  <button 
-                    type="submit"
-                    className="px-4 py-2 rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors flex items-center gap-2"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Add Item
-                  </button>
-                </div>
-              </form>
+            <FinOpsAudit
+              defaultMonthlySpend={
+                currentTotals.recurringMonthly > 0 ? currentTotals.recurringMonthly : 12500
+              }
+            />
+          )}
+        </div>
+
+        {/* Right Column: Summary rail + Global toggles + Delete */}
+        <div className="space-y-6">
+          {activeTab === 'estimate' ? (
+            <EstimateSummary
+              totals={currentTotals}
+              contingencyPercentage={contingencyPercentage}
+              profitMargin={profitMargin}
+              onExport={handleExportEstimate}
+            />
+          ) : (
+            <div className="border border-rule rounded-card bg-paper-raised p-6 space-y-4">
+              <h2 className="text-xs font-medium uppercase tracking-wider text-ink-muted">
+                Audit export
+              </h2>
+              <Button variant="primary" onClick={handleExportAudit} className="w-full">
+                Export audit
+              </Button>
             </div>
           )}
 
-          {/* Line Items Table */}
-          <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
-            <div className="p-6 border-b border-border">
-              <h2 className="text-lg font-semibold text-foreground">Estimate Breakdown</h2>
-            </div>
-            <LineItemTable items={project.lineItems || []} onDelete={handleDeleteLineItem} isLocked={isLocked} />
-          </div>
-        </div>
+          {/* Global Toggles */}
+          <div className="border border-rule rounded-card bg-paper-raised p-6 space-y-4">
+            <h2 className="text-xs font-medium uppercase tracking-wider text-ink-muted">
+              Project adjustments
+            </h2>
 
-        {/* Sidebar Summary */}
-        <div className="space-y-6">
-          <SummaryPanel 
-            baseCost={baseCost} 
-            recurringCost={recurringCost}
-            contingencyPercentage={contingencyPercentage}
-            profitMargin={profitMargin}
-            projectTitle={project.title}
-            clientName={project.client?.name}
-          />
+            <Field
+              label="Contingency buffer"
+              type="number"
+              step="1"
+              min="0"
+              max="100"
+              suffix="%"
+              value={contingencyPercentage}
+              onChange={(e) => setContingencyPercentage(Number(e.target.value))}
+              disabled={isLocked}
+            />
 
-          <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
-            <h3 className="text-sm font-semibold text-foreground mb-4">Global Toggles</h3>
-            <div className="space-y-4">
-              <div>
-                <label className="flex justify-between text-sm font-medium text-muted-foreground mb-2">
-                  <span>Contingency Buffer</span>
-                  <span>{contingencyPercentage}%</span>
-                </label>
-                <input 
-                  type="range" 
-                  min="0" max="50" step="5"
-                  value={contingencyPercentage}
-                  onChange={(e) => setContingencyPercentage(Number(e.target.value))}
-                  disabled={isLocked}
-                  className={`w-full accent-primary ${isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
-                />
-              </div>
-              <div>
-                <label className="flex justify-between text-sm font-medium text-muted-foreground mb-2">
-                  <span>Profit Margin</span>
-                  <span>{profitMargin}%</span>
-                </label>
-                <input 
-                  type="range" 
-                  min="0" max="100" step="5"
-                  value={profitMargin}
-                  onChange={(e) => setProfitMargin(Number(e.target.value))}
-                  disabled={isLocked}
-                  className={`w-full accent-primary ${isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
-                />
-              </div>
-            </div>
+            <Field
+              label="Profit margin"
+              type="number"
+              step="1"
+              min="0"
+              max="100"
+              suffix="%"
+              value={profitMargin}
+              onChange={(e) => setProfitMargin(Number(e.target.value))}
+              disabled={isLocked}
+            />
           </div>
-          
-          <div className="pt-4 border-t border-border mt-6">
-            <button
-              onClick={handleDeleteProject}
-              className="w-full bg-red-100 hover:bg-red-200 text-red-700 dark:bg-red-900/30 dark:hover:bg-red-900/50 dark:text-red-400 py-2.5 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 shadow-sm"
-            >
-              <Trash2 className="w-4 h-4" />
-              Delete Project
-            </button>
+
+          {/* Destructive Action with two-step inline confirm */}
+          <div className="border border-rule rounded-card bg-paper-raised p-6">
+            {confirmDeleteProject ? (
+              <div className="space-y-3">
+                <p className="text-xs text-danger">
+                  Permanently delete this estimate?
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button variant="danger" size="sm" onClick={handleDeleteProject} className="flex-1">
+                    Confirm delete
+                  </Button>
+                  <Button variant="quiet" size="sm" onClick={() => setConfirmDeleteProject(false)}>
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={() => setConfirmDeleteProject(true)}
+                className="w-full"
+              >
+                Delete estimate
+              </Button>
+            )}
           </div>
         </div>
       </div>

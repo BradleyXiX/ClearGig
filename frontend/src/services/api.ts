@@ -68,6 +68,18 @@ export interface UpdateProjectDTO {
 }
 
 // Global fetch helper
+export class ApiError extends Error {
+  readonly status: number;
+  readonly code?: string;
+
+  constructor(status: number, message: string, code?: string) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.code = code;
+  }
+}
+
 async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> {
   const baseUrl = getApiBaseUrl();
   const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
@@ -79,8 +91,21 @@ async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> 
     },
   });
   if (!res.ok) {
-    const error = await res.text();
-    throw new Error(`API Error ${res.status}: ${error}`);
+    // The API returns { error, message, code } and never raw error text.
+    // Fall back to a generic message for non-JSON responses (proxy pages).
+    let message = `Request failed (${res.status})`;
+    let code: string | undefined;
+    const raw = await res.text();
+    if (raw) {
+      try {
+        const body = JSON.parse(raw) as { error?: string; message?: string; code?: string };
+        message = body.message || body.error || message;
+        code = body.code;
+      } catch {
+        // not JSON - keep the generic message
+      }
+    }
+    throw new ApiError(res.status, message, code);
   }
   return res.json();
 }
