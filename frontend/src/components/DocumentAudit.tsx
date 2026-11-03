@@ -20,7 +20,7 @@ export function DocumentAudit({
   const percentageString = normalizedRate;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 print:space-y-4">
       {/* Scope / Baseline details */}
       <div className="border border-rule rounded-card bg-paper-sunken p-4 flex flex-col sm:flex-row justify-between gap-4 font-mono text-xs uppercase tracking-wider text-ink-muted">
         <div>

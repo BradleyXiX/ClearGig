@@ -12,7 +12,7 @@ export function DocumentEstimate({ project, totals }: DocumentEstimateProps) {
   const lineItems = project.lineItems || [];
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 print:space-y-4">
       {/* Ruled Line Items Table */}
       <div className="overflow-x-auto">
         <table className="w-full text-left text-sm border-collapse">
