@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const { exec } = require('child_process');
 require('dotenv').config();
 
 const projectRoutes = require('./routes/projects');
@@ -41,6 +42,21 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Something went wrong!', details: err.message });
 });
 
-app.listen(port, () => {
+// Helper to run database migrations with a safety timeout so it never blocks web traffic
+function runMigrations() {
+  console.log('Running database migrations...');
+  exec('npx prisma migrate deploy', { timeout: 30000 }, (error, stdout, stderr) => {
+    if (error) {
+      console.warn('Migration status notice:', error.message);
+      if (stderr) console.warn(stderr);
+    } else {
+      console.log('Database migrations applied successfully:\n', stdout);
+    }
+  });
+}
+
+// Bind explicitly to 0.0.0.0 for cloud platforms like Render
+app.listen(port, '0.0.0.0', () => {
   console.log(`Server is running on port: ${port}`);
+  runMigrations();
 });
