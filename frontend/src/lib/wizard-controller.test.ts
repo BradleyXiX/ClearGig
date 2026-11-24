@@ -306,3 +306,82 @@ test("recovery and success navigation: no nested interactive link/button and cli
   assert.match(pageSrc, /text-base/);
   assert.doesNotMatch(pageSrc, /px-3\s+py-2\s+text-ink\s+text-sm/);
 });
+
+test("pending write locks navigation and mutations: onShiftEnter, setStep, resetDraft, and field setters are rejected while saving", async () => {
+  const { deps, calls } = createMockDeps();
+
+  let signalProjectStarted!: () => void;
+  const projectStarted = new Promise<void>((resolve) => {
+    signalProjectStarted = resolve;
+  });
+
+  let resolveProject!: (val: { id: string }) => void;
+  const projectFinished = new Promise<{ id: string }>((resolve) => {
+    resolveProject = resolve;
+  });
+
+  deps.createProject = async (input) => {
+    calls.push(`createProject:${input.clientId}`);
+    signalProjectStarted();
+    return projectFinished;
+  };
+
+  const controller = createWizardController({
+    deps,
+    storage: { getItem: () => null, setItem: () => {} },
+  });
+
+  controller.setClientInput("Original Client");
+  controller.setTitle("Original Title");
+  controller.setFrontendHours("10");
+  controller.setBackendHours("5");
+  controller.setHourlyRate("150");
+  controller.setStep(4);
+
+  // Trigger save
+  const savePromise = controller.handleSave();
+
+  // Wait until project creation has started and is currently pending
+  await projectStarted;
+  assert.equal(controller.getState().isSaving, true);
+
+  // Attempt mutations and navigations while save is in-flight:
+  controller.onShiftEnter(); // Attempt navigation back
+  assert.equal(controller.getState().step, 4, "onShiftEnter must be locked during save");
+
+  controller.setStep(1); // Attempt explicit step change
+  assert.equal(controller.getState().step, 4, "setStep must be locked during save");
+
+  controller.setClientInput("Mutated Client"); // Attempt client change
+  assert.equal(controller.getState().clientInput, "Original Client", "setClientInput must be locked during save");
+
+  controller.setTitle("Mutated Title"); // Attempt title change
+  assert.equal(controller.getState().title, "Original Title", "setTitle must be locked during save");
+
+  controller.setFrontendHours("99"); // Attempt hours change
+  assert.equal(controller.getState().frontendHours, "10", "setFrontendHours must be locked during save");
+
+  controller.setBackendHours("99");
+  assert.equal(controller.getState().backendHours, "5", "setBackendHours must be locked during save");
+
+  controller.setHourlyRate("999");
+  assert.equal(controller.getState().hourlyRate, "150", "setHourlyRate must be locked during save");
+
+  controller.resetDraft(); // Attempt reset while in-flight
+  assert.equal(controller.getState().title, "Original Title", "resetDraft must be locked during save");
+  assert.equal(controller.getState().step, 4, "step must not reset to 1 while in-flight");
+
+  // Now resolve the pending project
+  resolveProject({ id: "p1" });
+  await savePromise;
+
+  // Verify successful completion associated with the original draft snapshot
+  assert.equal(controller.getState().isSaving, false);
+  assert.equal(controller.getState().savedProjectId, "p1");
+  assert.equal(controller.getState().step, 5);
+
+  // Once settled and idle, edits/reset work normally
+  controller.resetDraft();
+  assert.equal(controller.getState().step, 1);
+  assert.equal(controller.getState().title, "");
+});

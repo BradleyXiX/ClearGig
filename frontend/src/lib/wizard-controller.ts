@@ -115,12 +115,14 @@ export function createWizardController(options: WizardControllerOptions) {
     },
 
     setStep(step: number | ((prev: number) => number)) {
+      if (isSavingInFlight || state.isSaving) return;
       const nextStep = typeof step === 'function' ? step(state.step) : step;
       state = { ...state, step: nextStep };
       notify();
     },
 
     setClientInput(val: string) {
+      if (isSavingInFlight || state.isSaving) return;
       const trimmed = val.trim();
       const match = state.existingClients.find(
         (c) => c.name.toLowerCase() === trimmed.toLowerCase()
@@ -135,21 +137,25 @@ export function createWizardController(options: WizardControllerOptions) {
     },
 
     setTitle(val: string) {
+      if (isSavingInFlight || state.isSaving) return;
       state = { ...state, title: val };
       notify();
     },
 
     setFrontendHours(val: string) {
+      if (isSavingInFlight || state.isSaving) return;
       state = { ...state, frontendHours: val };
       notify();
     },
 
     setBackendHours(val: string) {
+      if (isSavingInFlight || state.isSaving) return;
       state = { ...state, backendHours: val };
       notify();
     },
 
     setHourlyRate(val: string) {
+      if (isSavingInFlight || state.isSaving) return;
       state = { ...state, hourlyRate: val };
       notify();
     },
@@ -160,7 +166,8 @@ export function createWizardController(options: WizardControllerOptions) {
     },
 
     resetDraft() {
-      // Explicit, deliberate fresh-draft action that clears recovery and draft
+      // Explicit, deliberate fresh-draft action that clears recovery and draft (blocked while saving)
+      if (isSavingInFlight || state.isSaving) return;
       state = {
         ...state,
         step: 1,
@@ -202,6 +209,7 @@ export function createWizardController(options: WizardControllerOptions) {
     },
 
     onShiftEnter() {
+      if (isSavingInFlight || state.isSaving) return;
       if (state.step > 1 && state.step < 5) {
         state = { ...state, step: state.step - 1 };
         notify();
@@ -222,6 +230,10 @@ export function createWizardController(options: WizardControllerOptions) {
       };
       notify();
 
+      // Snapshot the submitted draft values so asynchronous results associate strictly with this snapshot
+      const submittedClientId = state.selectedClientId;
+      const submittedClientName = state.clientInput.trim();
+      const submittedTitle = state.title.trim();
       const fHours = Number(state.frontendHours) || 0;
       const bHours = Number(state.backendHours) || 0;
       const rate = Number(state.hourlyRate) || 150;
@@ -231,9 +243,9 @@ export function createWizardController(options: WizardControllerOptions) {
       try {
         const res = await saveEstimate(
           {
-            clientId: state.selectedClientId,
-            clientName: state.clientInput.trim(),
-            title: state.title.trim(),
+            clientId: submittedClientId,
+            clientName: submittedClientName,
+            title: submittedTitle,
             frontendHours: fHours,
             backendHours: bHours,
             hourlyRate: rate,
@@ -261,14 +273,14 @@ export function createWizardController(options: WizardControllerOptions) {
               ...state,
               isSaving: false,
               recoverableProjectId: err.projectId,
-              selectedClientId: err.clientId ?? state.selectedClientId,
-              saveError: `Project "${state.title.trim()}" was created with ID: ${err.projectId}, but saving line items failed: ${err.message}. You can inspect or complete the project directly. Further creation is locked to prevent duplicate estimates.`,
+              selectedClientId: err.clientId ?? submittedClientId,
+              saveError: `Project "${submittedTitle}" was created with ID: ${err.projectId}, but saving line items failed: ${err.message}. You can inspect or complete the project directly. Further creation is locked to prevent duplicate estimates.`,
             };
           } else if (err.clientId) {
             // Client created, project creation failed. Retain clientId for retry without re-creating client.
             const updatedClients = [...state.existingClients];
             if (!updatedClients.some((c) => c.id === err.clientId)) {
-              updatedClients.push({ id: err.clientId, name: err.clientName || state.clientInput.trim() });
+              updatedClients.push({ id: err.clientId, name: err.clientName || submittedClientName });
             }
             state = {
               ...state,

@@ -76,6 +76,10 @@ export default function WizardPage() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        if (state.isSaving) {
+          // Saving is in-flight: do not silently abandon active write
+          return;
+        }
         if (state.confirmDiscard) {
           router.push('/dashboard');
         } else if (isDirty) {
@@ -104,7 +108,7 @@ export default function WizardPage() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [controller, isDirty, router, state.confirmDiscard]);
+  }, [controller, isDirty, router, state.confirmDiscard, state.isSaving]);
 
   return (
     <div className="max-w-xl mx-auto px-4 sm:px-6 py-12 text-ink">
