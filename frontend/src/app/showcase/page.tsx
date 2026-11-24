@@ -2,6 +2,7 @@ import React from "react";
 import type { Metadata } from "next";
 import { ShowcaseNav } from "@/components/showcase/ShowcaseNav";
 import { Hero } from "@/components/showcase/Hero";
+import { Approach } from "@/components/showcase/Approach";
 
 export const metadata: Metadata = {
   title: "ClearGig — Project Estimates, Considered",
@@ -26,6 +27,7 @@ export default function ShowcasePage() {
       {/* Main showcase container */}
       <main id="showcase-main" className="flex-1">
         <Hero />
+        <Approach />
       </main>
 
       {/* Minimal static showcase footer */}

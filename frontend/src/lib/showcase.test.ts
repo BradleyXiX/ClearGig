@@ -35,6 +35,12 @@ function loadComponent<T = Record<string, React.ComponentType<Record<string, unk
     if (id === "@/components/showcase/Hero" || id.includes("Hero")) {
       return loadComponent("src/components/showcase/Hero.tsx");
     }
+    if (id === "@/components/showcase/Approach" || id.includes("Approach")) {
+      return loadComponent("src/components/showcase/Approach.tsx");
+    }
+    if (id === "./EstimateExample" || id.includes("EstimateExample")) {
+      return loadComponent("src/components/showcase/EstimateExample.tsx");
+    }
     if (id === "./EstimateArtwork" || id.includes("EstimateArtwork")) {
       return loadComponent("src/components/showcase/EstimateArtwork.tsx");
     }
@@ -163,4 +169,63 @@ test("Route-aware Shell Integration: showcase and app routes render exactly one 
   assert.equal(appMains.length, 1, "App must render exactly one main");
   assert.match(appHtml, /Estimates/);
   assert.match(appHtml, /New estimate/);
+});
+
+test("Approach Section: renders Section 5D narrative, three step buttons, and live region", () => {
+  const { Approach } = loadComponent("src/components/showcase/Approach.tsx");
+  const html = ReactDOMServer.renderToStaticMarkup(React.createElement(Approach));
+
+  // Section id for in-page anchor
+  assert.match(html, /id="approach"/);
+  assert.match(html, /THE APPROACH/);
+  assert.match(html, /From scope/);
+  assert.match(html, /to a clear next step\./);
+  assert.match(html, /Define the work\. Understand the numbers\. Prepare the document\./);
+
+  // Three readable step buttons
+  assert.match(html, /01 Define the work/);
+  assert.match(html, /02 Review the numbers/);
+  assert.match(html, /03 Prepare the document/);
+
+  // Live region for screen readers
+  assert.match(html, /role="status"/);
+  assert.match(html, /aria-live="polite"/);
+
+  // Default scenario: Website refresh
+  assert.match(html, /Northline Studio/);
+  assert.match(html, /Website \+ content structure/);
+  assert.match(html, /Maintenance planning/);
+});
+
+test("EstimateExample & Scenarios: enforces price-free policy and accurate data switching across scenarios", () => {
+  const { EstimateExample } = loadComponent("src/components/showcase/EstimateExample.tsx");
+
+  // Render website scenario
+  const websiteHtml = ReactDOMServer.renderToStaticMarkup(
+    React.createElement(EstimateExample, { scenario: "website", activeStep: "01" })
+  );
+  assert.match(websiteHtml, /Northline Studio/);
+  assert.match(websiteHtml, /Frontend \+ backend/);
+  assert.match(websiteHtml, /Website \+ content structure/);
+  assert.match(websiteHtml, /Maintenance planning/);
+  assert.match(websiteHtml, /Ready to review/);
+
+  // Render product scenario
+  const productHtml = ReactDOMServer.renderToStaticMarkup(
+    React.createElement(EstimateExample, { scenario: "product", activeStep: "02" })
+  );
+  assert.match(productHtml, /Acme Platform Co\./);
+  assert.match(productHtml, /Interface \+ platform/);
+  assert.match(productHtml, /Product \+ supporting services/);
+  assert.match(productHtml, /Infrastructure planning/);
+  assert.match(productHtml, /Ready to review/);
+
+  // Strictly assert no prices, dollar symbols, or rates across both scenarios
+  for (const html of [websiteHtml, productHtml]) {
+    assert.doesNotMatch(html, /[$€£]/);
+    assert.doesNotMatch(html, /\/hr/i);
+    assert.doesNotMatch(html, /\/hour/i);
+    assert.doesNotMatch(html, /\b\d+(\.\d{2})?\s*(USD|EUR|GBP)\b/i);
+    assert.match(html, /Workflow preview · No pricing shown/);
+  }
 });
