@@ -1,6 +1,6 @@
 import { type Project, ApiError } from '../services/api.ts';
 
-export type LoadErrorType = 'not_found' | 'unavailable' | 'unknown' | null;
+export type LoadErrorType = 'not_found' | 'unavailable' | 'network' | 'server_error' | 'unknown' | null;
 
 export interface LineItemFormData {
   category: 'FRONTEND' | 'BACKEND' | 'CLOUD' | 'MAINTENANCE';
@@ -16,10 +16,11 @@ export interface ProjectControllerState {
   loadError: string | null;
   loadErrorType: LoadErrorType;
 
-  // Editable settings
+  // Editable adjustments (separate from server project state)
   contingencyPercentage: number;
   profitMargin: number;
   status: Project['status'];
+  isDirty: boolean;
 
   // Mutation in-flight and status states
   isSaving: boolean;
@@ -35,12 +36,14 @@ export interface ProjectControllerState {
   isDeletingProject: boolean;
   deleteProjectError: string | null;
 
+  // Refresh error after committed mutation
+  mutationCommittedRefreshError: string | null;
+
   // Add line item form
   lineItemForm: LineItemFormData;
 
   // UI state
   activeTab: 'estimate' | 'audit';
-  statusMenuOpen: boolean;
   confirmDeleteProject: boolean;
 }
 
@@ -60,6 +63,9 @@ export interface ProjectControllerOptions {
 export function createProjectController(options: ProjectControllerOptions) {
   const { projectId, api } = options;
 
+  let disposed = false;
+  let loadGeneration = 0;
+
   let state: ProjectControllerState = {
     project: null,
     isLoading: true,
@@ -69,6 +75,7 @@ export function createProjectController(options: ProjectControllerOptions) {
     contingencyPercentage: 0,
     profitMargin: 0,
     status: 'DRAFT',
+    isDirty: false,
 
     isSaving: false,
     saveError: null,
@@ -82,6 +89,7 @@ export function createProjectController(options: ProjectControllerOptions) {
 
     isDeletingProject: false,
     deleteProjectError: null,
+    mutationCommittedRefreshError: null,
 
     lineItemForm: {
       category: 'FRONTEND',
@@ -92,12 +100,12 @@ export function createProjectController(options: ProjectControllerOptions) {
     },
 
     activeTab: 'estimate',
-    statusMenuOpen: false,
     confirmDeleteProject: false,
   };
 
   const listeners = new Set<() => void>();
   const notify = () => {
+    if (disposed) return;
     for (const listener of listeners) {
       listener();
     }
@@ -119,36 +127,45 @@ export function createProjectController(options: ProjectControllerOptions) {
       return state;
     },
 
-    isDirty(): boolean {
-      if (!state.project) return false;
-      const initialContingency = Number(state.project.contingencyPercentage) || 0;
-      const initialMargin = Number(state.project.profitMargin) || 0;
-      const initialStatus = state.project.status;
+    dispose() {
+      disposed = true;
+      listeners.clear();
+    },
 
-      return (
-        state.contingencyPercentage !== initialContingency ||
-        state.profitMargin !== initialMargin ||
-        state.status !== initialStatus
-      );
+    isDirty(): boolean {
+      return state.isDirty;
     },
 
     setContingencyPercentage(val: number) {
-      state = { ...state, contingencyPercentage: val, saveSuccessMessage: null };
+      if (isSavingInFlight || state.isSaving) return;
+      state = {
+        ...state,
+        contingencyPercentage: val,
+        isDirty: true,
+        saveSuccessMessage: null,
+      };
       notify();
     },
 
     setProfitMargin(val: number) {
-      state = { ...state, profitMargin: val, saveSuccessMessage: null };
+      if (isSavingInFlight || state.isSaving) return;
+      state = {
+        ...state,
+        profitMargin: val,
+        isDirty: true,
+        saveSuccessMessage: null,
+      };
       notify();
     },
 
     setStatus(status: Project['status']) {
-      state = { ...state, status, saveSuccessMessage: null };
-      notify();
-    },
-
-    setStatusMenuOpen(open: boolean) {
-      state = { ...state, statusMenuOpen: open };
+      if (isSavingInFlight || state.isSaving) return;
+      state = {
+        ...state,
+        status,
+        isDirty: true,
+        saveSuccessMessage: null,
+      };
       notify();
     },
 
@@ -163,6 +180,7 @@ export function createProjectController(options: ProjectControllerOptions) {
     },
 
     setLineItemForm(form: Partial<LineItemFormData>) {
+      if (isAddingLineItemInFlight || state.isAddingLineItem) return;
       state = {
         ...state,
         lineItemForm: { ...state.lineItemForm, ...form },
@@ -179,41 +197,70 @@ export function createProjectController(options: ProjectControllerOptions) {
         addLineItemError: null,
         lineItemError: null,
         deleteProjectError: null,
+        mutationCommittedRefreshError: null,
       };
       notify();
     },
 
-    async loadProject() {
-      state = { ...state, isLoading: true, loadError: null, loadErrorType: null };
+    async loadProject(options?: { preserveDirtyDraft?: boolean }) {
+      if (disposed) return;
+      const currentGen = ++loadGeneration;
+
+      state = {
+        ...state,
+        isLoading: true,
+        loadError: null,
+        loadErrorType: null,
+      };
       notify();
 
       try {
         const data = await api.getProjectById(projectId);
+        if (disposed || currentGen !== loadGeneration) return;
+
+        // If preserveDirtyDraft is requested, keep user's edited adjustment fields intact
+        const shouldPreserveDraft = options?.preserveDirtyDraft && state.isDirty;
+
         state = {
           ...state,
           isLoading: false,
           project: data,
-          contingencyPercentage: Number(data.contingencyPercentage) || 0,
-          profitMargin: Number(data.profitMargin) || 0,
-          status: data.status,
+          contingencyPercentage: shouldPreserveDraft
+            ? state.contingencyPercentage
+            : Number(data.contingencyPercentage) || 0,
+          profitMargin: shouldPreserveDraft
+            ? state.profitMargin
+            : Number(data.profitMargin) || 0,
+          status: shouldPreserveDraft ? state.status : data.status,
+          isDirty: shouldPreserveDraft ? true : false,
           loadError: null,
           loadErrorType: null,
+          mutationCommittedRefreshError: null,
         };
         notify();
       } catch (err: unknown) {
+        if (disposed || currentGen !== loadGeneration) return;
+
         let loadErrorType: LoadErrorType = 'unknown';
-        let msg = 'Error loading project';
+        let msg = 'Failed to load estimate.';
 
         if (err instanceof ApiError) {
           if (err.status === 404) {
             loadErrorType = 'not_found';
-            msg = `Estimate "${projectId}" not found.`;
+            msg = `Estimate "${projectId}" not found in ledger.`;
           } else if (err.status === 503 || err.code === 'DB_UNAVAILABLE') {
             loadErrorType = 'unavailable';
             msg = 'Service temporarily unavailable. Unable to reach database.';
+          } else if (err.status >= 500) {
+            loadErrorType = 'server_error';
+            msg = `Server error (${err.status}): ${err.message}`;
           } else {
             msg = err.message;
           }
+        } else if (err instanceof TypeError || (err instanceof Error && err.name === 'TypeError')) {
+          // Raw fetch rejections (TypeError: Failed to fetch / network offline)
+          loadErrorType = 'network';
+          msg = 'Network connection failed. Check your internet connection or proxy.';
         } else if (err instanceof Error) {
           msg = err.message;
         }
@@ -221,7 +268,6 @@ export function createProjectController(options: ProjectControllerOptions) {
         state = {
           ...state,
           isLoading: false,
-          project: null,
           loadError: msg,
           loadErrorType,
         };
@@ -230,7 +276,7 @@ export function createProjectController(options: ProjectControllerOptions) {
     },
 
     async handleSaveProject() {
-      if (isSavingInFlight || state.isSaving || !controller.isDirty()) return;
+      if (isSavingInFlight || state.isSaving || !state.isDirty) return;
 
       isSavingInFlight = true;
       state = {
@@ -241,12 +287,19 @@ export function createProjectController(options: ProjectControllerOptions) {
       };
       notify();
 
+      // Snapshot the submitted adjustments
+      const submittedContingency = state.contingencyPercentage;
+      const submittedMargin = state.profitMargin;
+      const submittedStatus = state.status;
+
       try {
         const updated = await api.updateProject(projectId, {
-          contingency_percentage: state.contingencyPercentage,
-          profit_margin: state.profitMargin,
-          status: state.status,
+          contingency_percentage: submittedContingency,
+          profit_margin: submittedMargin,
+          status: submittedStatus,
         });
+
+        if (disposed) return;
 
         state = {
           ...state,
@@ -255,14 +308,16 @@ export function createProjectController(options: ProjectControllerOptions) {
           contingencyPercentage: Number(updated.contingencyPercentage) || 0,
           profitMargin: Number(updated.profitMargin) || 0,
           status: updated.status,
+          isDirty: false,
           saveSuccessMessage: 'Project adjustments saved successfully.',
         };
         isSavingInFlight = false;
         notify();
       } catch (err: unknown) {
         isSavingInFlight = false;
+        if (disposed) return;
         const msg = err instanceof Error ? err.message : 'Failed to save project adjustments';
-        // Note: Dirty values (contingencyPercentage, profitMargin, status) are strictly preserved
+        // Note: Dirty values are strictly preserved
         state = {
           ...state,
           isSaving: false,
@@ -295,7 +350,9 @@ export function createProjectController(options: ProjectControllerOptions) {
           is_recurring: isRecurring,
         });
 
-        // Reset form on success
+        if (disposed) return;
+
+        // Reset form on write success
         state = {
           ...state,
           isAddingLineItem: false,
@@ -310,11 +367,20 @@ export function createProjectController(options: ProjectControllerOptions) {
         isAddingLineItemInFlight = false;
         notify();
 
-        // Refresh project data
-        await controller.loadProject();
+        // Refresh project data while strictly preserving dirty draft adjustments
+        await controller.loadProject({ preserveDirtyDraft: true });
+        if (state.loadError && !disposed) {
+          state = {
+            ...state,
+            mutationCommittedRefreshError: 'Line item was saved, but refreshing project ledger failed. Click Retry to reload.',
+          };
+          notify();
+        }
       } catch (err: unknown) {
         isAddingLineItemInFlight = false;
+        if (disposed) return;
         const msg = err instanceof Error ? err.message : 'Failed to add line item';
+        // Form inputs remain preserved on rejected write
         state = {
           ...state,
           isAddingLineItem: false,
@@ -338,14 +404,26 @@ export function createProjectController(options: ProjectControllerOptions) {
       try {
         await api.deleteLineItem(itemId);
         deletingItemIdInFlight = null;
+        if (disposed) return;
+
         state = {
           ...state,
           deletingLineItemId: null,
         };
         notify();
-        await controller.loadProject();
+
+        // Refresh project data while strictly preserving dirty draft adjustments
+        await controller.loadProject({ preserveDirtyDraft: true });
+        if (state.loadError && !disposed) {
+          state = {
+            ...state,
+            mutationCommittedRefreshError: 'Line item was deleted, but refreshing project ledger failed. Click Retry to reload.',
+          };
+          notify();
+        }
       } catch (err: unknown) {
         deletingItemIdInFlight = null;
+        if (disposed) return;
         const msg = err instanceof Error ? err.message : 'Failed to delete line item';
         state = {
           ...state,
@@ -370,9 +448,12 @@ export function createProjectController(options: ProjectControllerOptions) {
       try {
         await api.deleteProject(projectId);
         isDeletingProjectInFlight = false;
-        onDeleted();
+        if (!disposed) {
+          onDeleted();
+        }
       } catch (err: unknown) {
         isDeletingProjectInFlight = false;
+        if (disposed) return;
         const msg = err instanceof Error ? err.message : 'Failed to delete project';
         state = {
           ...state,

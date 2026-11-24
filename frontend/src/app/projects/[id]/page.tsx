@@ -10,7 +10,6 @@ import {
   createProjectController,
   type ProjectControllerState,
 } from '@/lib/project-controller';
-import { Stamp } from '@/components/ui/Stamp';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import LineItemTable from '@/components/LineItemTable';
@@ -19,10 +18,13 @@ import { FinOpsAudit } from '@/components/FinOpsAudit';
 
 export default function ProjectDetail() {
   const { id } = useParams() as { id: string };
-  const router = useRouter();
-  const deleteTriggerRef = useRef<HTMLButtonElement | null>(null);
+  return <ProjectDetailContent key={id} id={id} />;
+}
 
-  // Initialize project controller once per component lifetime
+function ProjectDetailContent({ id }: { id: string }) {
+  const router = useRouter();
+
+  // Controller initialized once per component lifetime (keyed by id at the route level)
   const [controller] = React.useState(() =>
     createProjectController({
       projectId: id,
@@ -38,7 +40,12 @@ export default function ProjectDetail() {
 
   useEffect(() => {
     controller.loadProject();
+    return () => {
+      controller.dispose();
+    };
   }, [controller]);
+
+  const deleteTriggerRef = useRef<HTMLButtonElement | null>(null);
 
   const handleCancelDeleteProject = () => {
     controller.setConfirmDeleteProject(false);
@@ -65,7 +72,8 @@ export default function ProjectDetail() {
     );
   }
 
-  if (state.loadErrorType === 'not_found' || (!state.project && !state.isLoading && state.loadErrorType !== 'unavailable')) {
+  // HTTP 404: Estimate explicitly not found
+  if (state.loadErrorType === 'not_found') {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12 text-center space-y-4">
         <h2 className="text-2xl font-semibold text-ink">Estimate not found</h2>
@@ -84,12 +92,24 @@ export default function ProjectDetail() {
     );
   }
 
-  if (state.loadErrorType === 'unavailable') {
+  // Network / 5xx / Service Unavailable / Connection rejections: Truthful retryable error screen
+  if (
+    state.loadErrorType === 'unavailable' ||
+    state.loadErrorType === 'network' ||
+    state.loadErrorType === 'server_error' ||
+    (!state.project && state.loadError)
+  ) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12 text-center space-y-4">
-        <h2 className="text-2xl font-semibold text-ink">Service unavailable</h2>
+        <h2 className="text-2xl font-semibold text-ink">
+          {state.loadErrorType === 'network'
+            ? 'Network connection failed'
+            : state.loadErrorType === 'server_error'
+            ? 'Server error'
+            : 'Service temporarily unavailable'}
+        </h2>
         <p className="text-sm text-ink-muted max-w-md mx-auto">
-          {state.loadError ?? 'Unable to connect to the ClearGig database service. Your data is safe.'}
+          {state.loadError ?? 'Unable to connect to the ClearGig service.'}
         </p>
         <div className="flex items-center justify-center gap-3 pt-2">
           <Button variant="primary" onClick={() => controller.loadProject()}>
@@ -106,9 +126,23 @@ export default function ProjectDetail() {
     );
   }
 
-  const project = state.project!;
+  if (!state.project) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12 text-center space-y-4">
+        <h2 className="text-2xl font-semibold text-ink">Estimate not loaded</h2>
+        <p className="text-sm text-ink-muted">An unexpected error occurred while loading estimate data.</p>
+        <div>
+          <Button variant="primary" onClick={() => controller.loadProject()}>
+            Retry
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  const project = state.project;
   const isLocked = state.status !== 'DRAFT';
-  const isDirty = controller.isDirty();
+  const isDirty = state.isDirty;
 
   const currentTotals = computeTotals({
     lineItems: project.lineItems || [],
@@ -146,45 +180,23 @@ export default function ProjectDetail() {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Status Stamp with accessible dropdown menu */}
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => controller.setStatusMenuOpen(!state.statusMenuOpen)}
-                aria-expanded={state.statusMenuOpen}
-                aria-haspopup="listbox"
-                className="p-1 rounded-control hover:bg-paper-sunken transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-forest"
-                title="Change status"
+            {/* Native labelled <select> for status with clear accessible styling */}
+            <div className="flex items-center gap-2">
+              <label htmlFor="project-status-select" className="sr-only">
+                Estimate status
+              </label>
+              <select
+                id="project-status-select"
+                value={state.status}
+                onChange={(e) => controller.setStatus(e.target.value as typeof state.status)}
+                disabled={state.isSaving}
+                className="bg-paper-raised text-ink border border-rule rounded-control px-3 py-2 text-xs uppercase tracking-wider font-semibold focus:outline-none focus:border-accent disabled:opacity-50"
               >
-                <Stamp status={state.status} />
-              </button>
-              {state.statusMenuOpen && (
-                <div
-                  role="listbox"
-                  aria-label="Estimate status options"
-                  className="absolute right-0 mt-1 z-30 bg-paper-raised border border-rule rounded-card p-1 flex flex-col gap-1 min-w-36 shadow-lg"
-                >
-                  {(['DRAFT', 'SENT', 'ACCEPTED', 'REJECTED'] as const).map((s) => (
-                    <button
-                      key={s}
-                      type="button"
-                      role="option"
-                      aria-selected={state.status === s}
-                      onClick={() => {
-                        controller.setStatus(s);
-                        controller.setStatusMenuOpen(false);
-                      }}
-                      className={`px-3 py-1.5 text-left text-xs uppercase tracking-wider rounded-control transition-colors duration-150 ${
-                        state.status === s
-                          ? 'bg-ink text-paper font-semibold'
-                          : 'text-ink hover:bg-paper-sunken'
-                      }`}
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
-              )}
+                <option value="DRAFT">Draft</option>
+                <option value="SENT">Sent</option>
+                <option value="ACCEPTED">Accepted</option>
+                <option value="REJECTED">Rejected</option>
+              </select>
             </div>
 
             <Button
@@ -223,12 +235,31 @@ export default function ProjectDetail() {
           </div>
         )}
 
-        {/* Two-item switch under title: Estimate | FinOps audit */}
-        <div className="flex items-center gap-6 border-b border-rule mt-6" role="tablist">
+        {state.mutationCommittedRefreshError && (
+          <div
+            role="alert"
+            className="mt-4 border border-danger rounded-card p-3 bg-paper-sunken text-xs text-danger flex justify-between items-center"
+          >
+            <span>{state.mutationCommittedRefreshError}</span>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => controller.loadProject({ preserveDirtyDraft: true })}
+            >
+              Retry read
+            </Button>
+          </div>
+        )}
+
+        {/* Two-item switch under title: Estimate | FinOps audit with labelled button group and aria-pressed */}
+        <div
+          className="flex items-center gap-6 border-b border-rule mt-6"
+          role="group"
+          aria-label="Estimate section switch"
+        >
           <button
             type="button"
-            role="tab"
-            aria-selected={state.activeTab === 'estimate'}
+            aria-pressed={state.activeTab === 'estimate'}
             onClick={() => controller.setActiveTab('estimate')}
             className={`py-2 border-b-2 text-sm transition-colors duration-150 ${
               state.activeTab === 'estimate'
@@ -240,8 +271,7 @@ export default function ProjectDetail() {
           </button>
           <button
             type="button"
-            role="tab"
-            aria-selected={state.activeTab === 'audit'}
+            aria-pressed={state.activeTab === 'audit'}
             onClick={() => controller.setActiveTab('audit')}
             className={`py-2 border-b-2 text-sm transition-colors duration-150 ${
               state.activeTab === 'audit'
