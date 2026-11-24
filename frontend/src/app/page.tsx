@@ -1,268 +1,410 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useSyncExternalStore, useId } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { api, type Client } from '@/services/api';
-import { saveEstimate, SaveEstimateError, type SaveDeps } from '@/lib/save-estimate';
+import { api } from '@/services/api';
+import { type SaveDeps } from '@/lib/save-estimate';
+import {
+  createWizardController,
+  type WizardState,
+} from '@/lib/wizard-controller';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { Rule } from '@/components/ui/Rule';
 
 export default function WizardPage() {
   const router = useRouter();
-  const [step, setStep] = useState(1);
-  const [existingClients, setExistingClients] = useState<Client[]>([]);
-  const [clientInput, setClientInput] = useState('');
-  const [selectedClientId, setSelectedClientId] = useState<string | undefined>();
-  const [title, setTitle] = useState('');
-  const [frontendHours, setFrontendHours] = useState('');
-  const [backendHours, setBackendHours] = useState('');
-  const [hourlyRate, setHourlyRate] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const cached = localStorage.getItem('cleargig.rate');
-      if (cached) return cached;
-    }
-    return '150';
-  });
-  const [isSaving, setIsSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const [recoverableProjectId, setRecoverableProjectId] = useState<string | null>(null);
-  const [savedProjectId, setSavedProjectId] = useState<string | null>(null);
-  const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const clientInputId = useId();
 
-  useEffect(() => {
-    api.getClients().then(setExistingClients).catch(() => {});
-  }, []);
-
-  const fHours = Number(frontendHours) || 0;
-  const bHours = Number(backendHours) || 0;
-  const rate = Number(hourlyRate) || 150;
-  const baseCost = (fHours + bHours) * rate;
-  const contingency = Math.round(baseCost * 0.15);
-  const total = baseCost + contingency;
-  const isDirty = Boolean(clientInput || title || frontendHours || backendHours);
-
-  const handleSave = React.useCallback(async () => {
-    if (isSaving) return;
-    setIsSaving(true);
-    setSaveError(null);
-    setRecoverableProjectId(null);
-    try {
-      localStorage.setItem('cleargig.rate', String(rate));
-      const deps: SaveDeps = {
-        createClient: (name) => api.createClient({ name }),
-        createProject: (i) => api.createProject({
+  // Create wizard controller once per component lifetime using lazy state initializer
+  const [controller] = React.useState(() => {
+    const deps: SaveDeps = {
+      createClient: (name) => api.createClient({ name }),
+      createProject: (i) =>
+        api.createProject({
           client_id: i.clientId,
           title: i.title,
           contingency_percentage: i.contingencyPercentage,
           profit_margin: i.profitMargin,
         }),
-        addLineItem: (projectId, i) => api.addLineItem(projectId, {
+      addLineItem: (projectId, i) =>
+        api.addLineItem(projectId, {
           category: i.category,
           description: i.description,
           estimated_hours: i.estimatedHours,
           hourly_rate: i.hourlyRate,
           is_recurring: i.isRecurring,
         }),
-      };
-      const res = await saveEstimate({
-        clientId: selectedClientId,
-        clientName: clientInput.trim(),
-        title: title.trim(),
-        frontendHours: fHours,
-        backendHours: bHours,
-        hourlyRate: rate,
-        contingencyPercentage: 15,
-        profitMargin: 0,
-      }, deps);
-      setSavedProjectId(res.projectId);
-      setStep(5);
-      router.push('/projects/' + res.projectId);
-    } catch (err: unknown) {
-      if (err instanceof SaveEstimateError) {
-        if (err.projectId) {
-          setRecoverableProjectId(err.projectId);
-          setSaveError(`Project was created with ID: ${err.projectId}, but saving line items failed. You can open the project to inspect or resume adding items without creating duplicate projects.`);
-        } else if (err.clientId) {
-          setSaveError(`Client "${err.clientName}" was created, but creating the project failed: ${err.message}`);
-        } else {
-          setSaveError(err.message);
-        }
-      } else {
-        setSaveError(err instanceof Error ? err.message : 'Failed to save estimate');
-      }
-    } finally {
-      setIsSaving(false);
+    };
+    return createWizardController({ deps });
+  });
+
+  // Subscribe to controller state changes with useSyncExternalStore
+  const state: WizardState = useSyncExternalStore(
+    controller.subscribe,
+    controller.getState,
+    controller.getState
+  );
+
+  useEffect(() => {
+    api
+      .getClients()
+      .then((clients) => {
+        controller.setClients(clients);
+      })
+      .catch(() => {});
+  }, [controller]);
+
+  // Navigate upon successful save
+  useEffect(() => {
+    if (state.savedProjectId && state.step === 5) {
+      router.push(`/projects/${state.savedProjectId}`);
     }
-  }, [isSaving, rate, selectedClientId, clientInput, title, fHours, bHours, router]);
+  }, [state.savedProjectId, state.step, router]);
+
+  const fHours = Number(state.frontendHours) || 0;
+  const bHours = Number(state.backendHours) || 0;
+  const rate = Number(state.hourlyRate) || 150;
+  const baseCost = (fHours + bHours) * rate;
+  const contingency = Math.round(baseCost * 0.15);
+  const total = baseCost + contingency;
+  const isDirty = Boolean(
+    state.clientInput || state.title || state.frontendHours || state.backendHours
+  );
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (confirmDiscard) router.push('/dashboard');
-        else if (isDirty) setConfirmDiscard(true);
-        else router.push('/dashboard');
+        if (state.confirmDiscard) {
+          router.push('/dashboard');
+        } else if (isDirty) {
+          controller.setConfirmDiscard(true);
+        } else {
+          router.push('/dashboard');
+        }
       } else if (e.key === 'Enter') {
         const target = e.target;
-        if (target instanceof HTMLElement && (target.tagName === 'BUTTON' || target.tagName === 'A' || target.getAttribute('role') === 'button')) {
+        if (
+          target instanceof HTMLElement &&
+          (target.tagName === 'BUTTON' ||
+            target.tagName === 'A' ||
+            target.getAttribute('role') === 'button')
+        ) {
           // Let the focused button or link handle its own activation
           return;
         }
 
         if (e.shiftKey) {
-          if (step > 1 && step < 5) setStep((s) => s - 1);
+          controller.onShiftEnter();
         } else {
-          if (step === 1 && clientInput.trim()) setStep(2);
-          else if (step === 2 && title.trim()) setStep(3);
-          else if (step === 3 && (fHours > 0 || bHours > 0)) setStep(4);
-          else if (step === 4 && !isSaving) handleSave();
+          controller.onEnter();
         }
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [step, clientInput, title, fHours, bHours, confirmDiscard, isDirty, isSaving, router, handleSave]);
+  }, [controller, isDirty, router, state.confirmDiscard]);
 
   return (
     <div className="max-w-xl mx-auto px-4 sm:px-6 py-12 text-ink">
       <div role="status" aria-live="polite" className="sr-only">
-        {step === 1 && 'Step 1 of 5: Client identification'}
-        {step === 2 && 'Step 2 of 5: Project title'}
-        {step === 3 && 'Step 3 of 5: Scope hours and shared rate'}
-        {step === 4 && 'Step 4 of 5: Estimate review'}
-        {step === 5 && 'Step 5 of 5: Estimate saved'}
+        {state.step === 1 && 'Step 1 of 5: Client identification'}
+        {state.step === 2 && 'Step 2 of 5: Project title'}
+        {state.step === 3 && 'Step 3 of 5: Scope hours and shared rate'}
+        {state.step === 4 && 'Step 4 of 5: Estimate review'}
+        {state.step === 5 && 'Step 5 of 5: Estimate saved'}
       </div>
 
       <div className="space-y-2 mb-8">
         <div className="flex justify-between items-center text-xs font-mono uppercase tracking-wider text-ink-muted">
           <span>New estimate</span>
-          <span>Step {step} of 5</span>
+          <span>Step {state.step} of 5</span>
         </div>
         <Rule />
       </div>
 
-      {confirmDiscard && (
+      {state.confirmDiscard && (
         <div className="border border-danger rounded-card p-4 bg-paper-sunken space-y-3 mb-6">
           <p className="text-xs text-danger">Discard draft and return to dashboard?</p>
           <div className="flex gap-2">
-            <Button variant="danger" size="sm" onClick={() => router.push('/dashboard')}>Discard</Button>
-            <Button variant="quiet" size="sm" onClick={() => setConfirmDiscard(false)}>Continue editing</Button>
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={() => router.push('/dashboard')}
+            >
+              Discard
+            </Button>
+            <Button
+              variant="quiet"
+              size="sm"
+              onClick={() => controller.setConfirmDiscard(false)}
+            >
+              Continue editing
+            </Button>
           </div>
         </div>
       )}
 
-      {saveError && (
+      {state.saveError && (
         <div className="border border-danger rounded-card p-4 bg-paper-sunken text-xs text-danger mb-6 space-y-3">
-          <p>{saveError}</p>
-          {recoverableProjectId && (
-            <div>
-              <Link href={`/projects/${recoverableProjectId}`}>
-                <Button variant="primary" size="sm">
-                  View partial project ({recoverableProjectId})
-                </Button>
+          <p>{state.saveError}</p>
+          {state.recoverableProjectId && (
+            <div className="flex flex-wrap items-center gap-3 pt-2">
+              <Link
+                href={`/projects/${state.recoverableProjectId}`}
+                className="inline-flex items-center justify-center font-sans rounded-control font-medium h-9 px-3 py-1.5 text-xs uppercase tracking-wider bg-ink text-paper hover:bg-forest transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-forest"
+              >
+                Inspect partial project ({state.recoverableProjectId})
               </Link>
+              <Button
+                variant="quiet"
+                size="sm"
+                onClick={() => controller.resetDraft()}
+              >
+                Start fresh draft
+              </Button>
             </div>
           )}
         </div>
       )}
 
-      {step === 1 && (
+      {state.step === 1 && (
         <div className="space-y-6">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-ink">Who is the client?</h1>
-            <p className="text-xs uppercase tracking-wider text-ink-muted mt-1">Select an existing client or enter a new name</p>
+            <h1 className="text-2xl font-semibold tracking-tight text-ink">
+              Who is the client?
+            </h1>
+            <p className="text-xs uppercase tracking-wider text-ink-muted mt-1">
+              Select an existing client or enter a new name
+            </p>
           </div>
-          <div className="space-y-2">
-            <input
-              list="wizard-clients"
-              value={clientInput}
-              onChange={(e) => {
-                const val = e.target.value;
-                setClientInput(val);
-                const match = existingClients.find((c) => c.name.toLowerCase() === val.trim().toLowerCase());
-                setSelectedClientId(match ? match.id : undefined);
-              }}
-              placeholder="Client name"
-              autoFocus
-              className="w-full border border-rule rounded-control bg-paper-sunken px-3 py-2 text-ink text-sm focus:outline-none focus:border-accent"
-            />
+          <div className="flex flex-col gap-1.5">
+            <label
+              htmlFor={clientInputId}
+              className="text-sm font-medium text-ink-muted"
+            >
+              Client name
+            </label>
+            <div className="flex items-center w-full bg-paper text-ink border border-control-border rounded-control px-3 py-2 text-base transition-colors duration-150 focus-within:ring-2 focus-within:ring-offset-1 focus-within:ring-forest">
+              <input
+                id={clientInputId}
+                list="wizard-clients"
+                value={state.clientInput}
+                onChange={(e) => controller.setClientInput(e.target.value)}
+                placeholder="e.g. Acme Corporation"
+                autoFocus
+                className="w-full bg-transparent outline-none placeholder:text-ink-muted placeholder:opacity-60 text-base"
+              />
+            </div>
             <datalist id="wizard-clients">
-              {existingClients.map((c) => <option key={c.id} value={c.name} />)}
+              {state.existingClients.map((c) => (
+                <option key={c.id} value={c.name} />
+              ))}
             </datalist>
-            {selectedClientId && <span className="text-xs font-mono text-accent">Existing client selected</span>}
+            {state.selectedClientId && (
+              <span className="text-xs font-mono text-accent">
+                Existing client selected
+              </span>
+            )}
           </div>
           <div className="flex justify-between items-center pt-4">
-            <Button variant="quiet" onClick={() => isDirty ? setConfirmDiscard(true) : router.push('/dashboard')}>Cancel</Button>
-            <Button variant="primary" disabled={!clientInput.trim()} onClick={() => setStep(2)}>Continue</Button>
+            <Button
+              variant="quiet"
+              onClick={() =>
+                isDirty ? controller.setConfirmDiscard(true) : router.push('/dashboard')
+              }
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              disabled={!state.clientInput.trim()}
+              onClick={() => controller.setStep(2)}
+            >
+              Continue
+            </Button>
           </div>
         </div>
       )}
 
-      {step === 2 && (
+      {state.step === 2 && (
         <div className="space-y-6">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-ink">What is the project title?</h1>
-            <p className="text-xs uppercase tracking-wider text-ink-muted mt-1">Brief scope directive or project name</p>
+            <h1 className="text-2xl font-semibold tracking-tight text-ink">
+              What is the project title?
+            </h1>
+            <p className="text-xs uppercase tracking-wider text-ink-muted mt-1">
+              Brief scope directive or project name
+            </p>
           </div>
-          <Field label="Project title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Platform Migration" autoFocus />
+          <Field
+            label="Project title"
+            value={state.title}
+            onChange={(e) => controller.setTitle(e.target.value)}
+            placeholder="e.g. Platform Migration"
+            autoFocus
+          />
           <div className="flex justify-between items-center pt-4">
-            <Button variant="quiet" onClick={() => setStep(1)}>Back</Button>
-            <Button variant="primary" disabled={!title.trim()} onClick={() => setStep(3)}>Continue</Button>
+            <Button variant="quiet" onClick={() => controller.setStep(1)}>
+              Back
+            </Button>
+            <Button
+              variant="primary"
+              disabled={!state.title.trim()}
+              onClick={() => controller.setStep(3)}
+            >
+              Continue
+            </Button>
           </div>
         </div>
       )}
 
-      {step === 3 && (
+      {state.step === 3 && (
         <div className="space-y-6">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-ink">Estimated scope & rate</h1>
-            <p className="text-xs uppercase tracking-wider text-ink-muted mt-1">Enter hours and shared hourly rate</p>
+            <h1 className="text-2xl font-semibold tracking-tight text-ink">
+              Estimated scope & rate
+            </h1>
+            <p className="text-xs uppercase tracking-wider text-ink-muted mt-1">
+              Enter hours and shared hourly rate
+            </p>
           </div>
           <div className="space-y-4">
-            <Field label="Frontend scope" type="number" min="0" suffix="hrs" value={frontendHours} onChange={(e) => setFrontendHours(e.target.value)} autoFocus />
-            <Field label="Backend scope" type="number" min="0" suffix="hrs" value={backendHours} onChange={(e) => setBackendHours(e.target.value)} />
-            <Field label="Shared hourly rate" type="number" min="1" prefix="$" suffix="/hr" value={hourlyRate} onChange={(e) => setHourlyRate(e.target.value)} />
+            <Field
+              label="Frontend scope"
+              type="number"
+              min="0"
+              suffix="hrs"
+              value={state.frontendHours}
+              onChange={(e) => controller.setFrontendHours(e.target.value)}
+              autoFocus
+            />
+            <Field
+              label="Backend scope"
+              type="number"
+              min="0"
+              suffix="hrs"
+              value={state.backendHours}
+              onChange={(e) => controller.setBackendHours(e.target.value)}
+            />
+            <Field
+              label="Shared hourly rate"
+              type="number"
+              min="1"
+              prefix="$"
+              suffix="/hr"
+              value={state.hourlyRate}
+              onChange={(e) => controller.setHourlyRate(e.target.value)}
+            />
           </div>
           <div className="flex justify-between items-center pt-4">
-            <Button variant="quiet" onClick={() => setStep(2)}>Back</Button>
-            <Button variant="primary" disabled={fHours <= 0 && bHours <= 0} onClick={() => setStep(4)}>Review</Button>
+            <Button variant="quiet" onClick={() => controller.setStep(2)}>
+              Back
+            </Button>
+            <Button
+              variant="primary"
+              disabled={fHours <= 0 && bHours <= 0}
+              onClick={() => controller.setStep(4)}
+            >
+              Review
+            </Button>
           </div>
         </div>
       )}
 
-      {step === 4 && (
+      {state.step === 4 && (
         <div className="space-y-6">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-ink">Review estimate</h1>
-            <p className="text-xs uppercase tracking-wider text-ink-muted mt-1">Verify details before creating</p>
+            <h1 className="text-2xl font-semibold tracking-tight text-ink">
+              Review estimate
+            </h1>
+            <p className="text-xs uppercase tracking-wider text-ink-muted mt-1">
+              Verify details before creating
+            </p>
           </div>
           <div className="border border-rule rounded-card bg-paper-raised p-6 space-y-4 font-mono text-sm">
-            <div className="flex justify-between text-ink"><span className="text-ink-muted font-sans text-xs uppercase tracking-wider">Client</span><span className="font-medium">{clientInput}</span></div>
-            <div className="flex justify-between text-ink"><span className="text-ink-muted font-sans text-xs uppercase tracking-wider">Title</span><span className="font-medium">{title}</span></div>
-            <div className="flex justify-between text-ink"><span className="text-ink-muted font-sans text-xs uppercase tracking-wider">Scope</span><span>{fHours}h FE + {bHours}h BE @ ${rate}/hr</span></div>
-            <div className="flex justify-between text-ink"><span className="text-ink-muted font-sans text-xs uppercase tracking-wider">Contingency (15%)</span><span className="tabular-nums">${contingency.toLocaleString('en-US')}</span></div>
+            <div className="flex justify-between text-ink">
+              <span className="text-ink-muted font-sans text-xs uppercase tracking-wider">
+                Client
+              </span>
+              <span className="font-medium">{state.clientInput}</span>
+            </div>
+            <div className="flex justify-between text-ink">
+              <span className="text-ink-muted font-sans text-xs uppercase tracking-wider">
+                Title
+              </span>
+              <span className="font-medium">{state.title}</span>
+            </div>
+            <div className="flex justify-between text-ink">
+              <span className="text-ink-muted font-sans text-xs uppercase tracking-wider">
+                Scope
+              </span>
+              <span>
+                {fHours}h FE + {bHours}h BE @ ${rate}/hr
+              </span>
+            </div>
+            <div className="flex justify-between text-ink">
+              <span className="text-ink-muted font-sans text-xs uppercase tracking-wider">
+                Contingency (15%)
+              </span>
+              <span className="tabular-nums">
+                ${contingency.toLocaleString('en-US')}
+              </span>
+            </div>
             <Rule strong />
             <div className="flex justify-between items-baseline pt-2">
-              <span className="font-sans text-xs uppercase tracking-wider text-ink-muted">Total</span>
-              <span className="text-4xl font-semibold tabular-nums text-accent">${total.toLocaleString('en-US')}</span>
+              <span className="font-sans text-xs uppercase tracking-wider text-ink-muted">
+                Total
+              </span>
+              <span className="text-4xl font-semibold tabular-nums text-accent">
+                ${total.toLocaleString('en-US')}
+              </span>
             </div>
           </div>
           <div className="flex justify-between items-center pt-4">
-            <Button variant="quiet" onClick={() => setStep(3)}>Back</Button>
-            <Button variant="primary" disabled={isSaving} onClick={handleSave}>{isSaving ? 'Saving...' : 'Save estimate'}</Button>
+            <Button
+              variant="quiet"
+              disabled={state.isSaving}
+              onClick={() => controller.setStep(3)}
+            >
+              Back
+            </Button>
+            <Button
+              variant="primary"
+              disabled={state.isSaving || Boolean(state.recoverableProjectId)}
+              onClick={() => controller.handleSave()}
+            >
+              {state.isSaving
+                ? 'Saving...'
+                : state.recoverableProjectId
+                ? 'Creation locked'
+                : 'Save estimate'}
+            </Button>
           </div>
         </div>
       )}
 
-      {step === 5 && (
+      {state.step === 5 && (
         <div className="space-y-6 text-center py-8">
-          <h1 className="text-2xl font-semibold tracking-tight text-ink">Estimate saved</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-ink">
+            Estimate saved
+          </h1>
           <p className="text-sm text-ink-muted">Project has been created successfully.</p>
-          {savedProjectId && (
+          {state.savedProjectId && (
             <div className="pt-4 flex justify-center gap-4">
-              <Link href={`/projects/${savedProjectId}`}><Button variant="primary">Open estimate</Button></Link>
-              <Link href="/dashboard"><Button variant="quiet">Go to dashboard</Button></Link>
+              <Link
+                href={`/projects/${state.savedProjectId}`}
+                className="inline-flex items-center justify-center font-sans rounded-control select-none transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-forest px-4 py-2 text-sm font-medium h-11 bg-ink text-paper hover:bg-forest"
+              >
+                Open estimate
+              </Link>
+              <Link
+                href="/dashboard"
+                className="inline-flex items-center justify-center font-sans rounded-control select-none transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-forest px-4 py-2 text-sm font-medium h-11 bg-transparent text-ink-muted hover:text-ink hover:bg-paper-sunken"
+              >
+                Go to dashboard
+              </Link>
             </div>
           )}
         </div>
