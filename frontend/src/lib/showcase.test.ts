@@ -38,6 +38,12 @@ function loadComponent<T = Record<string, React.ComponentType<Record<string, unk
     if (id === "@/components/showcase/Approach" || id.includes("Approach")) {
       return loadComponent("src/components/showcase/Approach.tsx");
     }
+    if (id === "@/components/showcase/ProductSurfaces" || id.includes("ProductSurfaces")) {
+      return loadComponent("src/components/showcase/ProductSurfaces.tsx");
+    }
+    if (id === "./DocumentStory" || id.includes("DocumentStory")) {
+      return loadComponent("src/components/showcase/DocumentStory.tsx");
+    }
     if (id === "./EstimateExample" || id.includes("EstimateExample")) {
       return loadComponent("src/components/showcase/EstimateExample.tsx");
     }
@@ -236,4 +242,92 @@ test("EstimateExample & Scenarios: enforces price-free policy and accurate data 
       assert.match(html, /Workflow preview · No pricing shown/);
     }
   }
+});
+
+test("ProductSurfaces: renders Section 5E heading, eyebrow, 8/12 preview, and feature rail", () => {
+  const { ProductSurfaces } = loadComponent("src/components/showcase/ProductSurfaces.tsx");
+  const html = ReactDOMServer.renderToStaticMarkup(React.createElement(ProductSurfaces));
+
+  // Eyebrow and heading matching Section 5E
+  assert.match(html, /BUILT AROUND THE WORK/);
+  assert.match(html, /The details,/);
+  assert.match(html, /in order\./);
+  assert.match(html, /A focused workspace for the estimate and the conversation that follows\./);
+
+  // Section id matches ShowcaseNav anchor
+  assert.match(html, /id="workspace"/);
+
+  // 8/12 Preview explicitly labelled Sample workspace
+  assert.match(html, /Sample workspace/);
+  assert.match(html, /Illustrative records · No live data/);
+
+  // Four fixture projects
+  assert.match(html, /Website refresh/);
+  assert.match(html, /Northline Studio/);
+  assert.match(html, /Product build/);
+  assert.match(html, /Acme Platform Co\./);
+  assert.match(html, /Cloud infrastructure audit/);
+  assert.match(html, /Stratos Systems/);
+  assert.match(html, /Brand &amp; design system|Brand & design system/);
+  assert.match(html, /Kite &amp; Anchor|Kite & Anchor/);
+
+  // Status words and document types
+  assert.match(html, /Ready to review/);
+  assert.match(html, /In progress/);
+  assert.match(html, /Scenario modelled/);
+  assert.match(html, /Completed/);
+  assert.match(html, /Estimate/);
+  assert.match(html, /FinOps Audit/);
+
+  // Four ruled feature rail topics
+  assert.match(html, /Keep scope visible/);
+  assert.match(html, /Separate recurring costs/);
+  assert.match(html, /Review adjustments/);
+  assert.match(html, /Prepare a document/);
+});
+
+test("DocumentStory: renders offset estimate and FinOps document sheets with required caption", () => {
+  const { DocumentStory } = loadComponent("src/components/showcase/DocumentStory.tsx");
+  const html = ReactDOMServer.renderToStaticMarkup(React.createElement(DocumentStory));
+
+  // Section header
+  assert.match(html, /DOCUMENT ANATOMY/);
+  assert.match(html, /From scope definition/);
+  assert.match(html, /to a finished deliverable\./);
+
+  // Folios and document titles
+  assert.match(html, /FOLIO: CG-2026-E042/);
+  assert.match(html, /Website Refresh &amp; Architecture|Website Refresh & Architecture/);
+  assert.match(html, /Northline Studio/);
+
+  assert.match(html, /FOLIO: CG-2026-A018/);
+  assert.match(html, /Infrastructure Capacity &amp; Audit|Infrastructure Capacity & Audit/);
+  assert.match(html, /Stratos Systems/);
+
+  // Section 5E Mandatory Caption
+  assert.match(
+    html,
+    /Illustrative document structure\. Financial values appear in your working estimate\./
+  );
+
+  // Modest link to /dashboard
+  assert.match(html, /href="\/dashboard"[^>]*>[\s\S]*?Open workspace/);
+});
+
+test("ProductSurfaces & DocumentStory: enforce strict price-free policy", () => {
+  const { ProductSurfaces } = loadComponent("src/components/showcase/ProductSurfaces.tsx");
+  const html = ReactDOMServer.renderToStaticMarkup(React.createElement(ProductSurfaces));
+
+  // Strictly assert no currency symbols
+  assert.doesNotMatch(html, /[$€£]/);
+
+  // Strictly assert no hourly rates
+  assert.doesNotMatch(html, /\/hr/i);
+  assert.doesNotMatch(html, /\/hour/i);
+
+  // Strictly assert no monetary values or currency codes
+  assert.doesNotMatch(html, /\b\d+(\.\d{2})?\s*(USD|EUR|GBP)\b/i);
+
+  // Strictly assert no standalone percentage rates (like 15% or 20%)
+  assert.doesNotMatch(html, /\b\d+%/);
 });
