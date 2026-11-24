@@ -39,9 +39,9 @@ function ProjectDetailContent({ id }: { id: string }) {
   );
 
   useEffect(() => {
-    controller.loadProject();
+    const deactivate = controller.activate();
     return () => {
-      controller.dispose();
+      deactivate();
     };
   }, [controller]);
 
@@ -72,8 +72,8 @@ function ProjectDetailContent({ id }: { id: string }) {
     );
   }
 
-  // HTTP 404: Estimate explicitly not found
-  if (state.loadErrorType === 'not_found') {
+  // HTTP 404: Estimate explicitly not found (only when no project has ever loaded)
+  if (state.loadErrorType === 'not_found' && !state.project) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12 text-center space-y-4">
         <h2 className="text-2xl font-semibold text-ink">Estimate not found</h2>
@@ -92,12 +92,13 @@ function ProjectDetailContent({ id }: { id: string }) {
     );
   }
 
-  // Network / 5xx / Service Unavailable / Connection rejections: Truthful retryable error screen
+  // Network / 5xx / Service Unavailable / Connection rejections: Truthful retryable error screen (only when initial load fails)
   if (
-    state.loadErrorType === 'unavailable' ||
-    state.loadErrorType === 'network' ||
-    state.loadErrorType === 'server_error' ||
-    (!state.project && state.loadError)
+    !state.project &&
+    (state.loadErrorType === 'unavailable' ||
+      state.loadErrorType === 'network' ||
+      state.loadErrorType === 'server_error' ||
+      state.loadError)
   ) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12 text-center space-y-4">
@@ -143,6 +144,11 @@ function ProjectDetailContent({ id }: { id: string }) {
   const project = state.project;
   const isLocked = state.status !== 'DRAFT';
   const isDirty = state.isDirty;
+  const isAnyMutationPending =
+    state.isSaving ||
+    state.isAddingLineItem ||
+    state.deletingLineItemId !== null ||
+    state.isDeletingProject;
 
   const currentTotals = computeTotals({
     lineItems: project.lineItems || [],
@@ -189,7 +195,7 @@ function ProjectDetailContent({ id }: { id: string }) {
                 id="project-status-select"
                 value={state.status}
                 onChange={(e) => controller.setStatus(e.target.value as typeof state.status)}
-                disabled={state.isSaving}
+                disabled={isAnyMutationPending}
                 className="bg-paper-raised text-ink border border-rule rounded-control px-3 py-2 text-xs uppercase tracking-wider font-semibold focus:outline-none focus:border-accent disabled:opacity-50"
               >
                 <option value="DRAFT">Draft</option>
@@ -203,7 +209,7 @@ function ProjectDetailContent({ id }: { id: string }) {
               variant="primary"
               size="md"
               onClick={() => controller.handleSaveProject()}
-              disabled={!isDirty || state.isSaving}
+              disabled={!isDirty || isAnyMutationPending}
             >
               {state.isSaving ? 'Saving...' : 'Save'}
             </Button>
@@ -335,7 +341,7 @@ function ProjectDetailContent({ id }: { id: string }) {
                               category: e.target.value as typeof state.lineItemForm.category,
                             })
                           }
-                          disabled={state.isAddingLineItem}
+                          disabled={isAnyMutationPending}
                           className="w-full bg-paper-raised text-ink border border-rule rounded-control px-3 py-2 text-sm focus:outline-none focus:border-accent disabled:opacity-50"
                         >
                           <option value="FRONTEND">Frontend</option>
@@ -353,7 +359,7 @@ function ProjectDetailContent({ id }: { id: string }) {
                           onChange={(e) =>
                             controller.setLineItemForm({ description: e.target.value })
                           }
-                          disabled={state.isAddingLineItem}
+                          disabled={isAnyMutationPending}
                           required
                         />
                       </div>
@@ -368,7 +374,7 @@ function ProjectDetailContent({ id }: { id: string }) {
                           onChange={(e) =>
                             controller.setLineItemForm({ estimatedHours: e.target.value })
                           }
-                          disabled={state.isAddingLineItem}
+                          disabled={isAnyMutationPending}
                           required
                         />
                       </div>
@@ -384,7 +390,7 @@ function ProjectDetailContent({ id }: { id: string }) {
                           onChange={(e) =>
                             controller.setLineItemForm({ hourlyRate: e.target.value })
                           }
-                          disabled={state.isAddingLineItem}
+                          disabled={isAnyMutationPending}
                           required
                         />
                       </div>
@@ -398,7 +404,7 @@ function ProjectDetailContent({ id }: { id: string }) {
                           onChange={(e) =>
                             controller.setLineItemForm({ isRecurring: e.target.checked })
                           }
-                          disabled={state.isAddingLineItem}
+                          disabled={isAnyMutationPending}
                           className="accent-accent w-4 h-4 rounded-control"
                         />
                         <span className="text-xs uppercase tracking-wider text-ink">
@@ -409,7 +415,7 @@ function ProjectDetailContent({ id }: { id: string }) {
                         variant="secondary"
                         size="sm"
                         type="submit"
-                        disabled={state.isAddingLineItem}
+                        disabled={isAnyMutationPending}
                       >
                         {state.isAddingLineItem ? 'Adding item...' : 'Add item'}
                       </Button>
@@ -476,7 +482,7 @@ function ProjectDetailContent({ id }: { id: string }) {
               suffix="%"
               value={state.contingencyPercentage}
               onChange={(e) => controller.setContingencyPercentage(Number(e.target.value))}
-              disabled={isLocked || state.isSaving}
+              disabled={isLocked || isAnyMutationPending}
             />
 
             <Field
@@ -488,7 +494,7 @@ function ProjectDetailContent({ id }: { id: string }) {
               suffix="%"
               value={state.profitMargin}
               onChange={(e) => controller.setProfitMargin(Number(e.target.value))}
-              disabled={isLocked || state.isSaving}
+              disabled={isLocked || isAnyMutationPending}
             />
           </div>
 

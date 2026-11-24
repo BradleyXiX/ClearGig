@@ -212,6 +212,242 @@ test("attempting edits while an adjustment save is pending: setters are locked t
   assert.equal(controller.isDirty(), false);
 });
 
+test("real production lifecycle setup -> cleanup -> setup: second activation loads and becomes usable, late first-session responses remain ignored", async () => {
+  const { mockApi } = createMockApi();
+
+  let resolveFirstLoad!: (p: Project) => void;
+  const firstLoadPromise = new Promise<Project>((resolve) => {
+    resolveFirstLoad = resolve;
+  });
+
+  let loadCount = 0;
+  mockApi.getProjectById = async (id: string) => {
+    loadCount++;
+    if (loadCount === 1) {
+      return firstLoadPromise;
+    }
+    return createMockProject({ id, title: "Second Activation" });
+  };
+
+  const controller = createProjectController({ projectId: "p-replay", api: mockApi });
+
+  // First effect activation (setup)
+  const deactivate1 = controller.activate();
+  assert.equal(controller.getState().isLoading, true);
+
+  // React StrictMode or fast unmount (cleanup)
+  deactivate1();
+
+  // Second effect activation (setup)
+  const deactivate2 = controller.activate();
+  // Second load completes
+  await new Promise((r) => setTimeout(r, 10));
+
+  assert.equal(controller.getState().isLoading, false);
+  assert.equal(controller.getState().project?.title, "Second Activation");
+
+  // Late first-session response resolves
+  resolveFirstLoad(createMockProject({ id: "p-replay", title: "Stale First Load" }));
+  await firstLoadPromise;
+
+  // Stale first-session response was ignored, second activation remains active
+  assert.equal(controller.getState().project?.title, "Second Activation");
+
+  deactivate2();
+});
+
+test("edit adjustments, add item succeeds, refresh rejects: actual page branch markup renders committed-refresh notice with read-only retry, retry preserves dirty draft without re-POSTing", async () => {
+  const { mockApi, calls } = createMockApi();
+  let loadCount = 0;
+
+  mockApi.getProjectById = async (id: string) => {
+    loadCount++;
+    if (loadCount === 2) {
+      // Refresh after addLineItem fails
+      throw new ApiError(503, "Database refresh timeout");
+    }
+    return createMockProject({ id, contingencyPercentage: 15, profitMargin: 10 });
+  };
+
+  const controller = createProjectController({ projectId: "p-refresh-fail", api: mockApi });
+  const deactivate = controller.activate();
+  await new Promise((r) => setTimeout(r, 10));
+
+  // Edit adjustments locally without saving
+  controller.setContingencyPercentage(35);
+  controller.setProfitMargin(25);
+  controller.setStatus("SENT");
+  assert.equal(controller.isDirty(), true);
+
+  // Add line item
+  controller.setLineItemForm({
+    category: "CLOUD",
+    description: "Production DB",
+    estimatedHours: "8",
+    hourlyRate: "180",
+    isRecurring: true,
+  });
+
+  await controller.handleAddLineItem();
+
+  const state = controller.getState();
+  // Form was reset on write success
+  assert.equal(state.lineItemForm.description, "");
+  // Existing project data is preserved rather than blanked
+  assert.ok(state.project !== null, "project data must remain available");
+  // Dirty draft is preserved
+  assert.equal(state.contingencyPercentage, 35);
+  assert.equal(state.profitMargin, 25);
+  assert.equal(state.status, "SENT");
+  assert.equal(controller.isDirty(), true);
+  // Mutation committed refresh error is present
+  assert.match(state.mutationCommittedRefreshError || "", /Line item was saved, but refreshing project ledger failed/);
+
+  // Verify the page source has the dedicated inline committed-refresh alert and preserves the project view
+  const pageSrc = readFileSync(join(process.cwd(), "src/app/projects/[id]/page.tsx"), "utf8");
+  assert.match(pageSrc, /state\.mutationCommittedRefreshError/);
+  assert.match(pageSrc, /Retry read/);
+  assert.match(pageSrc, /controller\.loadProject\(\{\s*preserveDirtyDraft:\s*true\s*\}\)/);
+
+  // Invoke read-only retry
+  const addCallsBefore = calls.filter((c) => c.startsWith("addLineItem:")).length;
+  await controller.loadProject({ preserveDirtyDraft: true });
+  const addCallsAfter = calls.filter((c) => c.startsWith("addLineItem:")).length;
+
+  assert.equal(addCallsBefore, addCallsAfter, "Retry read must not re-POST addLineItem");
+  assert.equal(controller.getState().mutationCommittedRefreshError, null, "Refresh error cleared on success");
+  assert.equal(controller.getState().contingencyPercentage, 35, "Dirty contingency preserved on retry");
+  assert.equal(controller.getState().profitMargin, 25, "Dirty margin preserved on retry");
+  assert.equal(controller.getState().status, "SENT", "Dirty status preserved on retry");
+  assert.equal(controller.isDirty(), true);
+
+  deactivate();
+});
+
+test("mutation serialization: deferred adjustment save vs add/delete, and deferred add vs project delete serialize strictly", async () => {
+  const { mockApi } = createMockApi();
+
+  let signalSaveStarted!: () => void;
+  const saveStarted = new Promise<void>((resolve) => {
+    signalSaveStarted = resolve;
+  });
+
+  let resolveSave!: (p: Project) => void;
+  const saveFinished = new Promise<Project>((resolve) => {
+    resolveSave = resolve;
+  });
+
+  mockApi.updateProject = async () => {
+    signalSaveStarted();
+    return saveFinished;
+  };
+
+  const controller = createProjectController({ projectId: "p-serial", api: mockApi });
+  await controller.loadProject();
+
+  controller.setContingencyPercentage(40);
+  const savePromise = controller.handleSaveProject();
+  await saveStarted;
+
+  assert.equal(controller.getState().isSaving, true);
+  assert.equal(controller.isMutationPending(), true);
+
+  // While save is in flight, attempt addLineItem and handleDeleteLineItem and handleDeleteProject
+  controller.setLineItemForm({
+    category: "FRONTEND",
+    description: "Concurrent Add",
+    estimatedHours: "5",
+    hourlyRate: "100",
+  });
+  const addPromise = controller.handleAddLineItem();
+  const deletePromise = controller.handleDeleteLineItem("item-1");
+  let deleteProjectCalled = false;
+  const deleteProjectPromise = controller.handleDeleteProject(() => {
+    deleteProjectCalled = true;
+  });
+
+  await addPromise;
+  await deletePromise;
+  await deleteProjectPromise;
+
+  // Because mutation was locked by save, add, delete-item and delete-project were rejected immediately
+  assert.equal(deleteProjectCalled, false);
+  assert.equal(controller.getState().lineItemForm.description, "Concurrent Add", "Form retained when write is blocked");
+
+  // Complete the save
+  resolveSave(createMockProject({ id: "p-serial", contingencyPercentage: 40 }));
+  await savePromise;
+
+  assert.equal(controller.getState().isSaving, false);
+  assert.equal(controller.isMutationPending(), false);
+
+  // Now next action proceeds normally
+  let addStarted2 = false;
+  mockApi.addLineItem = async () => {
+    addStarted2 = true;
+    return {
+      id: "item-new",
+      projectId: "p-serial",
+      category: "FRONTEND",
+      description: "Concurrent Add",
+      estimatedHours: 5,
+      hourlyRate: 100,
+      isRecurring: false,
+    };
+  };
+  await controller.handleAddLineItem();
+  assert.equal(addStarted2, true, "After save reconciled, add proceeds");
+});
+
+test("concurrent double-submits and rejected-write form content preservation", async () => {
+  const { mockApi } = createMockApi();
+
+  let signalAddStarted!: () => void;
+  const addStarted = new Promise<void>((resolve) => {
+    signalAddStarted = resolve;
+  });
+
+  let rejectAdd!: (err: Error) => void;
+  const addFinished = new Promise<LineItem>((_, reject) => {
+    rejectAdd = reject;
+  });
+
+  mockApi.addLineItem = async () => {
+    signalAddStarted();
+    return addFinished;
+  };
+
+  const controller = createProjectController({ projectId: "p-dup", api: mockApi });
+  await controller.loadProject();
+
+  controller.setLineItemForm({
+    category: "BACKEND",
+    description: "Database Indexing",
+    estimatedHours: "4",
+    hourlyRate: "150",
+    isRecurring: false,
+  });
+
+  // Rapid double-click
+  const p1 = controller.handleAddLineItem();
+  const p2 = controller.handleAddLineItem();
+
+  await addStarted;
+  assert.equal(controller.getState().isAddingLineItem, true);
+
+  // Reject write
+  rejectAdd(new ApiError(500, "Database disk full"));
+  await Promise.all([p1, p2]);
+
+  // Form content strictly preserved so user does not lose input
+  const state = controller.getState();
+  assert.equal(state.lineItemForm.description, "Database Indexing");
+  assert.equal(state.lineItemForm.estimatedHours, "4");
+  assert.equal(state.lineItemForm.hourlyRate, "150");
+  assert.match(state.addLineItemError || "", /Database disk full/);
+  assert.equal(state.isAddingLineItem, false);
+});
+
 test("route replacement A -> B with delayed A response: B owns state, A callbacks are inert after disposal", async () => {
   const { mockApi } = createMockApi();
 
@@ -246,48 +482,6 @@ test("route replacement A -> B with delayed A response: B owns state, A callback
   // Controller A was disposed: listener notifications and state overwrites are inert
   assert.equal(controllerB.getState().project?.id, "proj-B");
   assert.equal(controllerA.getState().project, null);
-});
-
-test("committed item write followed by read failure: committed outcome reported with read-only retry without re-POSTing", async () => {
-  const { mockApi, calls } = createMockApi();
-  let loadCount = 0;
-
-  mockApi.getProjectById = async (id: string) => {
-    loadCount++;
-    if (loadCount === 2) {
-      // Second load (the post-add refresh) fails
-      throw new ApiError(503, "Database timeout on refresh");
-    }
-    return createMockProject({ id });
-  };
-
-  const controller = createProjectController({ projectId: "p123", api: mockApi });
-  await controller.loadProject(); // load 1 succeeds
-
-  controller.setLineItemForm({
-    category: "FRONTEND",
-    description: "New Feature",
-    estimatedHours: "10",
-    hourlyRate: "150",
-    isRecurring: false,
-  });
-
-  await controller.handleAddLineItem();
-
-  // Form was cleared because write succeeded
-  assert.equal(controller.getState().lineItemForm.description, "");
-
-  // Refresh failed, so mutationCommittedRefreshError is surfaced
-  assert.match(
-    controller.getState().mutationCommittedRefreshError || "",
-    /Line item was saved, but refreshing project ledger failed/
-  );
-
-  // Retrying only calls getProjectById (read-only retry), not addLineItem
-  const addCallsBefore = calls.filter((c) => c.startsWith("addLineItem:")).length;
-  await controller.loadProject({ preserveDirtyDraft: true });
-  const addCallsAfter = calls.filter((c) => c.startsWith("addLineItem:")).length;
-  assert.equal(addCallsBefore, addCallsAfter, "Retry must be read-only without re-POSTing write");
 });
 
 test("native status select and toggle buttons semantics in source markup", () => {

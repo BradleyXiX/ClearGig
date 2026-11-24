@@ -64,7 +64,8 @@ export function createProjectController(options: ProjectControllerOptions) {
   const { projectId, api } = options;
 
   let disposed = false;
-  let loadGeneration = 0;
+  let activeSessionId = 0;
+  let activeGeneration = 0;
 
   let state: ProjectControllerState = {
     project: null,
@@ -111,11 +112,8 @@ export function createProjectController(options: ProjectControllerOptions) {
     }
   };
 
-  // Synchronous in-flight guards
-  let isSavingInFlight = false;
-  let isAddingLineItemInFlight = false;
-  let isDeletingProjectInFlight = false;
-  let deletingItemIdInFlight: string | null = null;
+  // Synchronous unified mutation lock across save/add/item-delete/project-delete
+  let activeMutation: 'save' | 'add' | 'delete-item' | 'delete-project' | null = null;
 
   const controller = {
     subscribe(listener: () => void) {
@@ -127,8 +125,31 @@ export function createProjectController(options: ProjectControllerOptions) {
       return state;
     },
 
+    /**
+     * Called when an effect or coordinator mounts/activates.
+     * Returns an unmount/cleanup function for that specific session.
+     * Stale requests from previous sessions are muted, but a subsequent session
+     * can load and become fully active without discarding component-held controller state.
+     */
+    activate() {
+      const sessionId = ++activeSessionId;
+      // Trigger initial load for this active session
+      controller.loadProject();
+
+      return () => {
+        // When this session cleans up, bump session ID to invalidate pending requests from it
+        if (activeSessionId === sessionId) {
+          activeSessionId = ++activeSessionId;
+        }
+      };
+    },
+
+    /**
+     * Terminal disposal when the route or owner unmounts permanently.
+     */
     dispose() {
       disposed = true;
+      activeSessionId = ++activeSessionId;
       listeners.clear();
     },
 
@@ -136,8 +157,12 @@ export function createProjectController(options: ProjectControllerOptions) {
       return state.isDirty;
     },
 
+    isMutationPending(): boolean {
+      return activeMutation !== null;
+    },
+
     setContingencyPercentage(val: number) {
-      if (isSavingInFlight || state.isSaving) return;
+      if (activeMutation !== null || state.isSaving) return;
       state = {
         ...state,
         contingencyPercentage: val,
@@ -148,7 +173,7 @@ export function createProjectController(options: ProjectControllerOptions) {
     },
 
     setProfitMargin(val: number) {
-      if (isSavingInFlight || state.isSaving) return;
+      if (activeMutation !== null || state.isSaving) return;
       state = {
         ...state,
         profitMargin: val,
@@ -159,7 +184,7 @@ export function createProjectController(options: ProjectControllerOptions) {
     },
 
     setStatus(status: Project['status']) {
-      if (isSavingInFlight || state.isSaving) return;
+      if (activeMutation !== null || state.isSaving) return;
       state = {
         ...state,
         status,
@@ -170,6 +195,7 @@ export function createProjectController(options: ProjectControllerOptions) {
     },
 
     setConfirmDeleteProject(confirm: boolean) {
+      if (activeMutation !== null && confirm) return;
       state = { ...state, confirmDeleteProject: confirm };
       notify();
     },
@@ -180,7 +206,7 @@ export function createProjectController(options: ProjectControllerOptions) {
     },
 
     setLineItemForm(form: Partial<LineItemFormData>) {
-      if (isAddingLineItemInFlight || state.isAddingLineItem) return;
+      if (activeMutation === 'add' || state.isAddingLineItem) return;
       state = {
         ...state,
         lineItemForm: { ...state.lineItemForm, ...form },
@@ -204,11 +230,13 @@ export function createProjectController(options: ProjectControllerOptions) {
 
     async loadProject(options?: { preserveDirtyDraft?: boolean }) {
       if (disposed) return;
-      const currentGen = ++loadGeneration;
+      const thisSession = activeSessionId;
+      const thisGen = ++activeGeneration;
 
+      // Only show top-level isLoading if we don't already have project data
       state = {
         ...state,
-        isLoading: true,
+        isLoading: state.project === null,
         loadError: null,
         loadErrorType: null,
       };
@@ -216,7 +244,12 @@ export function createProjectController(options: ProjectControllerOptions) {
 
       try {
         const data = await api.getProjectById(projectId);
-        if (disposed || currentGen !== loadGeneration) return;
+        if (disposed || activeSessionId !== thisSession || activeGeneration !== thisGen) {
+          return;
+        }
+
+        // If a newer mutation has already updated project data, do not overwrite with older read
+        latestCommittedProjectDataVersion++;
 
         // If preserveDirtyDraft is requested, keep user's edited adjustment fields intact
         const shouldPreserveDraft = options?.preserveDirtyDraft && state.isDirty;
@@ -239,7 +272,9 @@ export function createProjectController(options: ProjectControllerOptions) {
         };
         notify();
       } catch (err: unknown) {
-        if (disposed || currentGen !== loadGeneration) return;
+        if (disposed || activeSessionId !== thisSession || activeGeneration !== thisGen) {
+          return;
+        }
 
         let loadErrorType: LoadErrorType = 'unknown';
         let msg = 'Failed to load estimate.';
@@ -265,6 +300,7 @@ export function createProjectController(options: ProjectControllerOptions) {
           msg = err.message;
         }
 
+        // If we already have a loaded project, preserve that project data rather than blanking it
         state = {
           ...state,
           isLoading: false,
@@ -276,9 +312,9 @@ export function createProjectController(options: ProjectControllerOptions) {
     },
 
     async handleSaveProject() {
-      if (isSavingInFlight || state.isSaving || !state.isDirty) return;
+      if (activeMutation !== null || !state.isDirty) return;
 
-      isSavingInFlight = true;
+      activeMutation = 'save';
       state = {
         ...state,
         isSaving: true,
@@ -291,6 +327,7 @@ export function createProjectController(options: ProjectControllerOptions) {
       const submittedContingency = state.contingencyPercentage;
       const submittedMargin = state.profitMargin;
       const submittedStatus = state.status;
+      const thisSession = activeSessionId;
 
       try {
         const updated = await api.updateProject(projectId, {
@@ -299,7 +336,10 @@ export function createProjectController(options: ProjectControllerOptions) {
           status: submittedStatus,
         });
 
-        if (disposed) return;
+        activeMutation = null;
+        if (disposed || activeSessionId !== thisSession) return;
+
+        latestCommittedProjectDataVersion++;
 
         state = {
           ...state,
@@ -310,12 +350,12 @@ export function createProjectController(options: ProjectControllerOptions) {
           status: updated.status,
           isDirty: false,
           saveSuccessMessage: 'Project adjustments saved successfully.',
+          mutationCommittedRefreshError: null,
         };
-        isSavingInFlight = false;
         notify();
       } catch (err: unknown) {
-        isSavingInFlight = false;
-        if (disposed) return;
+        activeMutation = null;
+        if (disposed || activeSessionId !== thisSession) return;
         const msg = err instanceof Error ? err.message : 'Failed to save project adjustments';
         // Note: Dirty values are strictly preserved
         state = {
@@ -328,18 +368,20 @@ export function createProjectController(options: ProjectControllerOptions) {
     },
 
     async handleAddLineItem() {
-      if (isAddingLineItemInFlight || state.isAddingLineItem) return;
+      if (activeMutation !== null) return;
 
       const { category, description, estimatedHours, hourlyRate, isRecurring } = state.lineItemForm;
       if (!description.trim() || !estimatedHours || !hourlyRate) return;
 
-      isAddingLineItemInFlight = true;
+      activeMutation = 'add';
       state = {
         ...state,
         isAddingLineItem: true,
         addLineItemError: null,
       };
       notify();
+
+      const thisSession = activeSessionId;
 
       try {
         await api.addLineItem(projectId, {
@@ -350,12 +392,9 @@ export function createProjectController(options: ProjectControllerOptions) {
           is_recurring: isRecurring,
         });
 
-        if (disposed) return;
-
         // Reset form on write success
         state = {
           ...state,
-          isAddingLineItem: false,
           lineItemForm: {
             category: 'FRONTEND',
             description: '',
@@ -364,12 +403,20 @@ export function createProjectController(options: ProjectControllerOptions) {
             isRecurring: false,
           },
         };
-        isAddingLineItemInFlight = false;
+
+        // Note: write has committed! Now refresh project while keeping draft intact
+        activeMutation = null;
+        state = {
+          ...state,
+          isAddingLineItem: false,
+        };
         notify();
+
+        if (disposed || activeSessionId !== thisSession) return;
 
         // Refresh project data while strictly preserving dirty draft adjustments
         await controller.loadProject({ preserveDirtyDraft: true });
-        if (state.loadError && !disposed) {
+        if (state.loadError && !disposed && activeSessionId === thisSession) {
           state = {
             ...state,
             mutationCommittedRefreshError: 'Line item was saved, but refreshing project ledger failed. Click Retry to reload.',
@@ -377,8 +424,8 @@ export function createProjectController(options: ProjectControllerOptions) {
           notify();
         }
       } catch (err: unknown) {
-        isAddingLineItemInFlight = false;
-        if (disposed) return;
+        activeMutation = null;
+        if (disposed || activeSessionId !== thisSession) return;
         const msg = err instanceof Error ? err.message : 'Failed to add line item';
         // Form inputs remain preserved on rejected write
         state = {
@@ -391,8 +438,9 @@ export function createProjectController(options: ProjectControllerOptions) {
     },
 
     async handleDeleteLineItem(itemId: string) {
-      if (deletingItemIdInFlight || state.deletingLineItemId) return;
+      if (activeMutation !== null) return;
 
+      activeMutation = 'delete-item';
       deletingItemIdInFlight = itemId;
       state = {
         ...state,
@@ -401,10 +449,12 @@ export function createProjectController(options: ProjectControllerOptions) {
       };
       notify();
 
+      const thisSession = activeSessionId;
+
       try {
         await api.deleteLineItem(itemId);
         deletingItemIdInFlight = null;
-        if (disposed) return;
+        activeMutation = null;
 
         state = {
           ...state,
@@ -412,9 +462,11 @@ export function createProjectController(options: ProjectControllerOptions) {
         };
         notify();
 
+        if (disposed || activeSessionId !== thisSession) return;
+
         // Refresh project data while strictly preserving dirty draft adjustments
         await controller.loadProject({ preserveDirtyDraft: true });
-        if (state.loadError && !disposed) {
+        if (state.loadError && !disposed && activeSessionId === thisSession) {
           state = {
             ...state,
             mutationCommittedRefreshError: 'Line item was deleted, but refreshing project ledger failed. Click Retry to reload.',
@@ -423,7 +475,8 @@ export function createProjectController(options: ProjectControllerOptions) {
         }
       } catch (err: unknown) {
         deletingItemIdInFlight = null;
-        if (disposed) return;
+        activeMutation = null;
+        if (disposed || activeSessionId !== thisSession) return;
         const msg = err instanceof Error ? err.message : 'Failed to delete line item';
         state = {
           ...state,
@@ -435,9 +488,9 @@ export function createProjectController(options: ProjectControllerOptions) {
     },
 
     async handleDeleteProject(onDeleted: () => void) {
-      if (isDeletingProjectInFlight || state.isDeletingProject) return;
+      if (activeMutation !== null) return;
 
-      isDeletingProjectInFlight = true;
+      activeMutation = 'delete-project';
       state = {
         ...state,
         isDeletingProject: true,
@@ -445,15 +498,17 @@ export function createProjectController(options: ProjectControllerOptions) {
       };
       notify();
 
+      const thisSession = activeSessionId;
+
       try {
         await api.deleteProject(projectId);
-        isDeletingProjectInFlight = false;
-        if (!disposed) {
+        activeMutation = null;
+        if (!disposed && activeSessionId === thisSession) {
           onDeleted();
         }
       } catch (err: unknown) {
-        isDeletingProjectInFlight = false;
-        if (disposed) return;
+        activeMutation = null;
+        if (disposed || activeSessionId !== thisSession) return;
         const msg = err instanceof Error ? err.message : 'Failed to delete project';
         state = {
           ...state,
