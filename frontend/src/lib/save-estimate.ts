@@ -38,12 +38,14 @@ export interface SaveResult {
 export class SaveEstimateError extends Error {
   clientId?: string;
   clientName?: string;
+  projectId?: string;
 
-  constructor(message: string, clientId?: string, clientName?: string) {
+  constructor(message: string, clientId?: string, clientName?: string, projectId?: string) {
     super(message);
     this.name = 'SaveEstimateError';
     this.clientId = clientId;
     this.clientName = clientName;
+    this.projectId = projectId;
   }
 }
 
@@ -90,24 +92,34 @@ export async function saveEstimate(
     );
   }
 
-  if (draft.frontendHours > 0) {
-    await deps.addLineItem(project.id, {
-      category: 'FRONTEND',
-      description: 'Frontend Development',
-      estimatedHours: draft.frontendHours,
-      hourlyRate: draft.hourlyRate,
-      isRecurring: false,
-    });
-  }
+  try {
+    if (draft.frontendHours > 0) {
+      await deps.addLineItem(project.id, {
+        category: 'FRONTEND',
+        description: 'Frontend Development',
+        estimatedHours: draft.frontendHours,
+        hourlyRate: draft.hourlyRate,
+        isRecurring: false,
+      });
+    }
 
-  if (draft.backendHours > 0) {
-    await deps.addLineItem(project.id, {
-      category: 'BACKEND',
-      description: 'Backend & API Development',
-      estimatedHours: draft.backendHours,
-      hourlyRate: draft.hourlyRate,
-      isRecurring: false,
-    });
+    if (draft.backendHours > 0) {
+      await deps.addLineItem(project.id, {
+        category: 'BACKEND',
+        description: 'Backend & API Development',
+        estimatedHours: draft.backendHours,
+        hourlyRate: draft.hourlyRate,
+        isRecurring: false,
+      });
+    }
+  } catch (err: unknown) {
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    throw new SaveEstimateError(
+      `Project "${draft.title}" was created (ID: ${project.id}), but saving line items failed: ${errorMsg}`,
+      clientId,
+      draft.clientName,
+      project.id
+    );
   }
 
   return {

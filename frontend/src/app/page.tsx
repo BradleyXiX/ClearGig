@@ -18,16 +18,21 @@ export default function WizardPage() {
   const [title, setTitle] = useState('');
   const [frontendHours, setFrontendHours] = useState('');
   const [backendHours, setBackendHours] = useState('');
-  const [hourlyRate, setHourlyRate] = useState('150');
+  const [hourlyRate, setHourlyRate] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const cached = localStorage.getItem('cleargig.rate');
+      if (cached) return cached;
+    }
+    return '150';
+  });
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [recoverableProjectId, setRecoverableProjectId] = useState<string | null>(null);
   const [savedProjectId, setSavedProjectId] = useState<string | null>(null);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
 
   useEffect(() => {
     api.getClients().then(setExistingClients).catch(() => {});
-    const cachedRate = localStorage.getItem('cleargig.rate');
-    if (cachedRate) setHourlyRate(cachedRate);
   }, []);
 
   const fHours = Number(frontendHours) || 0;
@@ -38,10 +43,11 @@ export default function WizardPage() {
   const total = baseCost + contingency;
   const isDirty = Boolean(clientInput || title || frontendHours || backendHours);
 
-  const handleSave = async () => {
+  const handleSave = React.useCallback(async () => {
     if (isSaving) return;
     setIsSaving(true);
     setSaveError(null);
+    setRecoverableProjectId(null);
     try {
       localStorage.setItem('cleargig.rate', String(rate));
       const deps: SaveDeps = {
@@ -75,14 +81,21 @@ export default function WizardPage() {
       router.push('/projects/' + res.projectId);
     } catch (err: unknown) {
       if (err instanceof SaveEstimateError) {
-        setSaveError(err.clientId ? `Client "${err.clientName}" was saved, but the estimate was not: ${err.message}` : err.message);
+        if (err.projectId) {
+          setRecoverableProjectId(err.projectId);
+          setSaveError(`Project was created with ID: ${err.projectId}, but saving line items failed. You can open the project to inspect or resume adding items without creating duplicate projects.`);
+        } else if (err.clientId) {
+          setSaveError(`Client "${err.clientName}" was created, but creating the project failed: ${err.message}`);
+        } else {
+          setSaveError(err.message);
+        }
       } else {
         setSaveError(err instanceof Error ? err.message : 'Failed to save estimate');
       }
     } finally {
       setIsSaving(false);
     }
-  };
+  }, [isSaving, rate, selectedClientId, clientInput, title, fHours, bHours, router]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -91,26 +104,40 @@ export default function WizardPage() {
         else if (isDirty) setConfirmDiscard(true);
         else router.push('/dashboard');
       } else if (e.key === 'Enter') {
+        const target = e.target;
+        if (target instanceof HTMLElement && (target.tagName === 'BUTTON' || target.tagName === 'A' || target.getAttribute('role') === 'button')) {
+          // Let the focused button or link handle its own activation
+          return;
+        }
+
         if (e.shiftKey) {
           if (step > 1 && step < 5) setStep((s) => s - 1);
         } else {
           if (step === 1 && clientInput.trim()) setStep(2);
           else if (step === 2 && title.trim()) setStep(3);
           else if (step === 3 && (fHours > 0 || bHours > 0)) setStep(4);
-          else if (step === 4) handleSave();
+          else if (step === 4 && !isSaving) handleSave();
         }
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [step, clientInput, title, fHours, bHours, confirmDiscard, isDirty, isSaving]);
+  }, [step, clientInput, title, fHours, bHours, confirmDiscard, isDirty, isSaving, router, handleSave]);
 
   return (
     <div className="max-w-xl mx-auto px-4 sm:px-6 py-12 text-ink">
+      <div role="status" aria-live="polite" className="sr-only">
+        {step === 1 && 'Step 1 of 5: Client identification'}
+        {step === 2 && 'Step 2 of 5: Project title'}
+        {step === 3 && 'Step 3 of 5: Scope hours and shared rate'}
+        {step === 4 && 'Step 4 of 5: Estimate review'}
+        {step === 5 && 'Step 5 of 5: Estimate saved'}
+      </div>
+
       <div className="space-y-2 mb-8">
         <div className="flex justify-between items-center text-xs font-mono uppercase tracking-wider text-ink-muted">
           <span>New estimate</span>
-          <span>{step} of 5</span>
+          <span>Step {step} of 5</span>
         </div>
         <Rule />
       </div>
@@ -126,8 +153,17 @@ export default function WizardPage() {
       )}
 
       {saveError && (
-        <div className="border border-danger rounded-card p-4 bg-paper-sunken text-xs text-danger mb-6">
-          {saveError}
+        <div className="border border-danger rounded-card p-4 bg-paper-sunken text-xs text-danger mb-6 space-y-3">
+          <p>{saveError}</p>
+          {recoverableProjectId && (
+            <div>
+              <Link href={`/projects/${recoverableProjectId}`}>
+                <Button variant="primary" size="sm">
+                  View partial project ({recoverableProjectId})
+                </Button>
+              </Link>
+            </div>
+          )}
         </div>
       )}
 

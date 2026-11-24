@@ -108,3 +108,24 @@ test("project failure with an existing client orphans nothing", async () => {
   );
 });
 
+test("line item failure preserves project and client identity for recovery", async () => {
+  const { d } = deps({
+    addLineItem: async () => {
+      throw new Error("line item database error");
+    },
+  });
+  await assert.rejects(
+    () => saveEstimate(draft(), d),
+    (err: unknown) => {
+      assert.ok(err instanceof SaveEstimateError);
+      assert.equal(err.projectId, "p1");
+      assert.equal(err.clientId, "c1");
+      assert.equal(err.clientName, "Acme");
+      assert.match(err.message, /p1/);
+      assert.match(err.message, /line item database error/);
+      return true;
+    }
+  );
+});
+
+
