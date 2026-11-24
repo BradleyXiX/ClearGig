@@ -566,9 +566,12 @@ test("Showcase Motion: Approach and ProductSurfaces preserve immediate readabili
   assert.match(productHtml, /Website refresh/);
   assert.match(productHtml, /Cloud infrastructure audit/);
 
-  // Product surfaces preview uses statically settled composition without layout shift or hidden state
+  // Product surfaces preview uses deliberate statically settled composition without entrance ownership
   assert.match(productHtml, /grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 mt-12 sm:mt-16 items-start/);
+  assert.doesNotMatch(productHtml, /transition-\[opacity,transform\]/);
   assert.doesNotMatch(productHtml, /opacity-0/);
+  assert.doesNotMatch(productHtml, /opacity-95/);
+  assert.doesNotMatch(productHtml, /translate-y-4/);
 });
 
 test("Showcase Motion: DocumentStory and Questions include motion-reduce overrides", () => {
@@ -833,7 +836,7 @@ test("Showcase Motion: WAAPI finish cancels fill animation and releases callback
   controller.destroy();
 });
 
-test("Showcase Motion: mount effect initializes from actual media-query and resists false hydration snapshots", () => {
+test("Showcase Motion: controller initializes from actual media-query and resists false hydration snapshots", () => {
   const { createHeroMotionController } = loadComponent<{
     createHeroMotionController: typeof import("../components/showcase/motion").createHeroMotionController;
   }>("src/components/showcase/motion.ts");

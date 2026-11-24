@@ -1,8 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useSyncExternalStore } from "react";
+import React, { useState } from "react";
 import { DocumentStory } from "./DocumentStory";
-import { MOTION, useReducedMotion } from "./motion";
 
 type FeatureKey = "scope" | "recurring" | "adjustments" | "document" | null;
 
@@ -101,53 +100,8 @@ const FEATURES: Array<{
     },
   ];
 
-const emptySubscribe = () => () => { };
-
 export function ProductSurfaces() {
   const [activeFeature, setActiveFeature] = useState<FeatureKey>(null);
-  // Client-mounted state determines if animation state can be active (for progressive enhancement)
-  // Initial SSR renders settled (opacity-100 translate-y-0) via getServerSnapshot: false
-  // Client renders mounted via getSnapshot: true
-  const isClient = useSyncExternalStore(
-    emptySubscribe,
-    () => true,
-    () => false
-  );
-  const [isRevealed, setIsRevealed] = useState<boolean>(false);
-  const previewRef = useRef<HTMLDivElement>(null);
-  const reducedMotion = useReducedMotion();
-
-  // Decorative preview reveal: runs once when entering viewport, <=16px / 350-450ms
-  // Asynchronously updates state only upon intersection observation, never synchronously in effect body
-  useEffect(() => {
-    // If IntersectionObserver is unavailable or motion is reduced, do not observe; fallback remains settled
-    if (typeof IntersectionObserver === "undefined" || reducedMotion || !isClient) {
-      return;
-    }
-
-    const el = previewRef.current;
-    if (!el) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) {
-            setIsRevealed(true);
-            observer.disconnect();
-          }
-        }
-      },
-      { threshold: 0.1 }
-    );
-
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [isClient, reducedMotion]);
-
-  // For no-JS / initial SSR / reduced-motion / missing IntersectionObserver / already revealed: always settled (opacity-100 translate-y-0)
-  // Check if IntersectionObserver exists in client window environment
-  const hasIntersectionObserver = typeof window !== "undefined" && typeof window.IntersectionObserver !== "undefined";
-  const isSettled = !isClient || reducedMotion || isRevealed || !hasIntersectionObserver;
 
   return (
     <section
@@ -175,16 +129,8 @@ export function ProductSurfaces() {
           </p>
         </div>
 
-        {/* Asymmetric 8/12 and 4/12 Composition (Decorative preview reveal owner) */}
-        <div
-          ref={previewRef}
-          style={{
-            transitionDuration: `${MOTION.SECTION_REVEAL_DURATION}ms`,
-            transitionTimingFunction: MOTION.EASE_CONSIDERED,
-          }}
-          className={`grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 mt-12 sm:mt-16 items-start transform-gpu transition-[opacity,transform] motion-reduce:transition-none motion-reduce:transform-none ${isSettled ? "opacity-100 translate-y-0" : "opacity-95 translate-y-4"
-            }`}
-        >
+        {/* Asymmetric 8/12 and 4/12 Composition */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 mt-12 sm:mt-16 items-start">
           {/* 8/12 Columns: DOM Dashboard Preview */}
           <div
             className="lg:col-span-8 bg-paper-sunken border border-rule rounded-panel p-4 sm:p-6 shadow-sm space-y-4"
