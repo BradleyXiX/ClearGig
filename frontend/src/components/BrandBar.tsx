@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { BrandMark } from "./ui/BrandMark";
 
 export function BrandBar() {
-  const pathname = usePathname();
+  const pathname = usePathname() || "";
 
   const isEstimatesActive =
     pathname === "/dashboard" || pathname.startsWith("/projects");

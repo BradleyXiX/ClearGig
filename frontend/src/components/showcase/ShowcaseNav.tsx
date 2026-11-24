@@ -4,52 +4,42 @@ import { BrandMark } from "../ui/BrandMark";
 
 export function ShowcaseNav() {
   return (
-    <header className="no-print w-full border-b border-rule bg-canvas sticky top-0 z-40 backdrop-blur-xs">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-wrap items-center justify-between min-h-14 py-2 sm:py-0 gap-y-2 gap-x-4">
-        <div className="flex items-center gap-4 sm:gap-8 min-h-10">
+    <header className="no-print w-full border-b border-rule bg-canvas">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between min-h-16 sm:min-h-20 py-3 sm:py-0">
+        <div className="flex items-center gap-6 sm:gap-10">
           <Link
             href="/showcase"
-            className="flex items-center gap-2 text-base font-semibold tracking-tight text-ink hover:text-forest transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-forest focus-visible:ring-offset-2 rounded-control outline-none py-1 shrink-0"
+            className="flex items-center gap-2.5 text-base font-semibold tracking-tight text-ink hover:text-forest transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-forest focus-visible:ring-offset-2 rounded-control outline-none py-1 shrink-0"
             aria-label="ClearGig Showcase home"
           >
             <BrandMark size={20} className="text-ink" />
             <span>ClearGig</span>
           </Link>
 
-          <nav className="flex items-center gap-3 sm:gap-6" aria-label="Showcase Sections">
-            <a
-              href="#overview"
-              className="text-sm py-1.5 text-ink-muted hover:text-ink transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-forest focus-visible:ring-offset-2 rounded-control outline-none"
-            >
-              Overview
-            </a>
+          {/* Desktop anchor navigation matching Section 5A; omitted on mobile to prevent crowding */}
+          <nav className="hidden sm:flex items-center gap-8" aria-label="Showcase Sections">
             <a
               href="#approach"
-              className="text-sm py-1.5 text-ink-muted hover:text-ink transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-forest focus-visible:ring-offset-2 rounded-control outline-none"
+              className="text-sm font-medium text-ink-muted hover:text-ink transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-forest focus-visible:ring-offset-2 rounded-control outline-none py-1"
             >
-              Approach
+              The approach
             </a>
             <a
               href="#workspace"
-              className="text-sm py-1.5 text-ink-muted hover:text-ink transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-forest focus-visible:ring-offset-2 rounded-control outline-none"
+              className="text-sm font-medium text-ink-muted hover:text-ink transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-forest focus-visible:ring-offset-2 rounded-control outline-none py-1"
             >
-              Workspace
+              Inside ClearGig
             </a>
           </nav>
         </div>
 
-        <div className="flex items-center gap-2.5 min-h-10 shrink-0">
+        {/* Quiet Open workspace action matching Section 5A (Build an estimate is owned by Hero) */}
+        <div className="flex items-center shrink-0">
           <Link
             href="/dashboard"
-            className="text-xs sm:text-sm font-medium text-ink-muted hover:text-ink transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-forest focus-visible:ring-offset-2 rounded-control outline-none px-2 py-1"
+            className="text-xs sm:text-sm font-medium text-ink-muted hover:text-ink transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-forest focus-visible:ring-offset-2 rounded-control outline-none px-3 py-1.5"
           >
-            Workspace
-          </Link>
-          <Link
-            href="/"
-            className="inline-flex items-center justify-center font-sans rounded-control select-none transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-forest px-3 py-1.5 text-xs uppercase tracking-wider font-medium h-9 bg-ink text-paper hover:bg-forest"
-          >
-            Build an estimate
+            Open workspace
           </Link>
         </div>
       </div>

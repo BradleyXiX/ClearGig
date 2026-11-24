@@ -38,6 +38,9 @@ function loadComponent<T = Record<string, React.ComponentType<Record<string, unk
     if (id === "./EstimateArtwork" || id.includes("EstimateArtwork")) {
       return loadComponent("src/components/showcase/EstimateArtwork.tsx");
     }
+    if (id === "./BrandBar" || id.includes("BrandBar")) {
+      return loadComponent("src/components/BrandBar.tsx");
+    }
     if (id.includes("BrandMark")) {
       const MockBrandMark = ({ size, className }: { size?: number; className?: string }) =>
         React.createElement("svg", { className, width: size, height: size });
@@ -100,25 +103,64 @@ test("Showcase Nav: provides section links and keyboard accessibility", () => {
   const { ShowcaseNav } = loadComponent("src/components/showcase/ShowcaseNav.tsx");
   const html = ReactDOMServer.renderToStaticMarkup(React.createElement(ShowcaseNav));
 
-  // Anchor links
-  assert.match(html, /href="#overview"/);
+  // Anchor links matching Section 5A
   assert.match(html, /href="#approach"/);
+  assert.match(html, /The approach/);
   assert.match(html, /href="#workspace"/);
+  assert.match(html, /Inside ClearGig/);
 
-  // Actions
+  // Quiet Open workspace action without prominent duplicate estimate CTA
   assert.match(html, /href="\/dashboard"/);
-  assert.match(html, /href="\/"/);
+  assert.match(html, /Open workspace/);
+  assert.doesNotMatch(html, /Build an estimate/);
 });
 
 test("Showcase Page: static server render with skip link and main landmark", () => {
   const mod = loadComponent<{ default: React.ComponentType }>("src/app/showcase/page.tsx");
   const html = ReactDOMServer.renderToStaticMarkup(React.createElement(mod.default));
 
-  // Skip link
-  assert.match(html, /href="#main-content"[^>]*>Skip to main content<\/a>/);
-  // Main landmark
-  assert.match(html, /<main id="main-content"/);
+  // Skip link and main landmark with matching id #showcase-main
+  assert.match(html, /href="#showcase-main"[^>]*>Skip to main content<\/a>/);
+  assert.match(html, /<main id="showcase-main"/);
   // Zero API calls or dynamic client-side loading spinners
   assert.doesNotMatch(html, /Loading\.\.\./i);
   assert.doesNotMatch(html, /fetch\(/);
+});
+
+test("Route-aware Shell Integration: showcase and app routes render exactly one header and one main", () => {
+  // Load layout / AppShell
+  const { AppShell } = loadComponent("src/components/AppShell.tsx");
+  const showcasePageMod = loadComponent<{ default: React.ComponentType }>("src/app/showcase/page.tsx");
+
+  // In showcase mode
+  const showcaseHtml = ReactDOMServer.renderToStaticMarkup(
+    React.createElement(
+      AppShell,
+      { pathname: "/showcase" },
+      React.createElement(showcasePageMod.default)
+    )
+  );
+
+  const showcaseHeaders = showcaseHtml.match(/<header\b[^>]*>/g) || [];
+  const showcaseMains = showcaseHtml.match(/<main\b[^>]*>/g) || [];
+  assert.equal(showcaseHeaders.length, 1, "Showcase must render exactly one header");
+  assert.equal(showcaseMains.length, 1, "Showcase must render exactly one main");
+  assert.match(showcaseHtml, /id="showcase-main"/);
+  assert.match(showcaseHtml, /href="#showcase-main"/);
+
+  // In app mode (e.g. /dashboard or /)
+  const appHtml = ReactDOMServer.renderToStaticMarkup(
+    React.createElement(
+      AppShell,
+      { pathname: "/dashboard" },
+      React.createElement("div", null, "Dashboard content")
+    )
+  );
+
+  const appHeaders = appHtml.match(/<header\b[^>]*>/g) || [];
+  const appMains = appHtml.match(/<main\b[^>]*>/g) || [];
+  assert.equal(appHeaders.length, 1, "App must render exactly one header");
+  assert.equal(appMains.length, 1, "App must render exactly one main");
+  assert.match(appHtml, /Estimates/);
+  assert.match(appHtml, /New estimate/);
 });
