@@ -44,6 +44,25 @@ export function isFinePointer(): boolean {
 }
 
 /**
+ * React hook tracking whether the primary pointer is fine.
+ * Subscribes to changes (e.g. tablet dock/undock, external mouse disconnect).
+ */
+export function useFinePointer(): boolean {
+  return useSyncExternalStore(
+    subscribeFinePointer,
+    isFinePointer,
+    () => false
+  );
+}
+
+function subscribeFinePointer(callback: () => void) {
+  if (typeof window === "undefined" || !window.matchMedia) return () => {};
+  const mql = window.matchMedia("(pointer: fine)");
+  mql.addEventListener("change", callback);
+  return () => mql.removeEventListener("change", callback);
+}
+
+/**
  * Check if the document is currently visible (SSR-safe).
  */
 export function isDocumentVisible(): boolean {
@@ -143,6 +162,7 @@ export interface HeroMotionController {
   setDocumentVisible(visible: boolean): void;
   setElementIntersecting(intersecting: boolean): void;
   setReducedMotion(reduced: boolean): void;
+  setFinePointer(fine: boolean): void;
   handleMouseMove(clientX: number, clientY: number): void;
   handleMouseLeave(): void;
   destroy(): void;
@@ -150,9 +170,11 @@ export interface HeroMotionController {
     isDocumentVisible: boolean;
     isElementIntersecting: boolean;
     isReducedMotion: boolean;
+    isFinePointer: boolean;
     hasStarted: boolean;
     hasFinished: boolean;
     isPlaying: boolean;
+    isDestroyed: boolean;
   };
 }
 
@@ -168,9 +190,11 @@ export function createHeroMotionController(config: HeroMotionConfig): HeroMotion
     config.elementIntersecting !== undefined ? config.elementIntersecting : false;
   let isReducedMotionState =
     config.reducedMotion !== undefined ? config.reducedMotion : prefersReducedMotion();
+  let isFinePointerState = isFinePointer();
 
   let hasStartedState = false;
   let hasFinishedState = false;
+  let isDestroyedState = false;
   let activeAnimation: Animation | null = null;
 
   const settleSheetImmediately = () => {
@@ -190,6 +214,8 @@ export function createHeroMotionController(config: HeroMotionConfig): HeroMotion
   };
 
   const checkAndTrigger = () => {
+    if (isDestroyedState) return;
+
     if (isReducedMotionState) {
       settleSheetImmediately();
       clearTiltImmediately();
@@ -215,7 +241,7 @@ export function createHeroMotionController(config: HeroMotionConfig): HeroMotion
   };
 
   const startAnimation = () => {
-    if (hasStartedState || hasFinishedState || isReducedMotionState) {
+    if (isDestroyedState || hasStartedState || hasFinishedState || isReducedMotionState) {
       settleSheetImmediately();
       return;
     }
@@ -255,6 +281,9 @@ export function createHeroMotionController(config: HeroMotionConfig): HeroMotion
 
       anim.onfinish = () => {
         hasFinishedState = true;
+        // Commit settled inline styles, detach callback, and cancel/release WAAPI fill animation
+        anim.onfinish = null;
+        anim.cancel();
         activeAnimation = null;
         settleSheetImmediately();
         config.onFinished?.();
@@ -275,37 +304,50 @@ export function createHeroMotionController(config: HeroMotionConfig): HeroMotion
 
   return {
     start() {
+      if (isDestroyedState) return;
       checkAndTrigger();
     },
 
     setDocumentVisible(visible: boolean) {
+      if (isDestroyedState) return;
       isDocumentVisibleState = visible;
       checkAndTrigger();
     },
 
     setElementIntersecting(intersecting: boolean) {
+      if (isDestroyedState) return;
       isElementIntersectingState = intersecting;
       checkAndTrigger();
     },
 
     setReducedMotion(reduced: boolean) {
-      const wasReduced = isReducedMotionState;
+      if (isDestroyedState) return;
       isReducedMotionState = reduced;
 
       if (reduced) {
+        // Reduced motion requested: cancel any running animation and mark finished so it never starts later
+        hasFinishedState = true;
         if (activeAnimation) {
+          activeAnimation.onfinish = null;
           activeAnimation.cancel();
           activeAnimation = null;
         }
         settleSheetImmediately();
         clearTiltImmediately();
-      } else if (wasReduced && !hasStartedState && !hasFinishedState) {
-        checkAndTrigger();
+      }
+      // If toggled back from reduced to normal, hasFinishedState prevents replaying or starting deferred assembly
+    },
+
+    setFinePointer(fine: boolean) {
+      if (isDestroyedState) return;
+      isFinePointerState = fine;
+      if (!fine) {
+        clearTiltImmediately();
       }
     },
 
     handleMouseMove(clientX: number, clientY: number) {
-      if (isReducedMotionState || !isFinePointer()) return;
+      if (isDestroyedState || isReducedMotionState || !isFinePointerState) return;
 
       const container = config.getContainer();
       if (!container) return;
@@ -320,10 +362,12 @@ export function createHeroMotionController(config: HeroMotionConfig): HeroMotion
     },
 
     handleMouseLeave() {
+      if (isDestroyedState) return;
+
       const container = config.getContainer();
       if (!container) return;
 
-      if (isReducedMotionState) {
+      if (isReducedMotionState || !isFinePointerState) {
         container.style.transition = "none";
         container.style.transform = "none";
       } else {
@@ -333,10 +377,14 @@ export function createHeroMotionController(config: HeroMotionConfig): HeroMotion
     },
 
     destroy() {
+      isDestroyedState = true;
       if (activeAnimation) {
+        activeAnimation.onfinish = null;
         activeAnimation.cancel();
         activeAnimation = null;
       }
+      settleSheetImmediately();
+      clearTiltImmediately();
     },
 
     getStatus() {
@@ -344,9 +392,11 @@ export function createHeroMotionController(config: HeroMotionConfig): HeroMotion
         isDocumentVisible: isDocumentVisibleState,
         isElementIntersecting: isElementIntersectingState,
         isReducedMotion: isReducedMotionState,
+        isFinePointer: isFinePointerState,
         hasStarted: hasStartedState,
         hasFinished: hasFinishedState,
         isPlaying: activeAnimation?.playState === "running",
+        isDestroyed: isDestroyedState,
       };
     },
   };

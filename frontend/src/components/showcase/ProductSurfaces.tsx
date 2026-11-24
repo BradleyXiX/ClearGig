@@ -120,7 +120,8 @@ export function ProductSurfaces() {
   // Decorative preview reveal: runs once when entering viewport, <=16px / 350-450ms
   // Asynchronously updates state only upon intersection observation, never synchronously in effect body
   useEffect(() => {
-    if (!isClient || reducedMotion || typeof IntersectionObserver === "undefined") {
+    // If IntersectionObserver is unavailable or motion is reduced, do not observe; fallback remains settled
+    if (typeof IntersectionObserver === "undefined" || reducedMotion || !isClient) {
       return;
     }
 
@@ -143,9 +144,10 @@ export function ProductSurfaces() {
     return () => observer.disconnect();
   }, [isClient, reducedMotion]);
 
-  // For no-JS / initial SSR / reduced-motion: always settled (opacity-100 translate-y-0)
-  // Only when client-mounted and reducedMotion is false does it animate from offset to settled upon intersection
-  const isSettled = !isClient || reducedMotion || isRevealed;
+  // For no-JS / initial SSR / reduced-motion / missing IntersectionObserver / already revealed: always settled (opacity-100 translate-y-0)
+  // Check if IntersectionObserver exists in client window environment
+  const hasIntersectionObserver = typeof window !== "undefined" && typeof window.IntersectionObserver !== "undefined";
+  const isSettled = !isClient || reducedMotion || isRevealed || !hasIntersectionObserver;
 
   return (
     <section
@@ -181,7 +183,7 @@ export function ProductSurfaces() {
             transitionTimingFunction: MOTION.EASE_CONSIDERED,
           }}
           className={`grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 mt-12 sm:mt-16 items-start transform-gpu transition-[opacity,transform] motion-reduce:transition-none motion-reduce:transform-none ${
-            isSettled ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+            isSettled ? "opacity-100 translate-y-0" : "opacity-95 translate-y-4"
           }`}
         >
           {/* 8/12 Columns: DOM Dashboard Preview */}

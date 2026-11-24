@@ -694,22 +694,8 @@ test("Showcase Motion: createHeroMotionController respects reduced motion, gatin
   assert.equal(animateCallCount, 1, "Assembly animation must never replay after completion");
 
   // Tilt manipulation with fine pointer
-  // Ensure window and matchMedia exist in test runner environment
-  const globalObj = globalThis as unknown as { window?: { matchMedia: (query: string) => unknown } };
-  const prevWindow = globalObj.window;
-  globalObj.window = {
-    matchMedia: (query: string) => ({
-      matches: query.includes("pointer: fine"),
-      media: query,
-      onchange: null,
-      addListener: () => {},
-      removeListener: () => {},
-      addEventListener: () => {},
-      removeEventListener: () => {},
-      dispatchEvent: () => false,
-    }),
-  };
-
+  // Ensure fine pointer is enabled on controller
+  controller.setFinePointer(true);
   controller.handleMouseMove(100, 100);
   assert.ok(containerStyle.transform && containerStyle.transform.includes("rotateX"), "Outer container should have tilt transform");
 
@@ -724,10 +710,127 @@ test("Showcase Motion: createHeroMotionController respects reduced motion, gatin
   controller.handleMouseMove(50, 50);
   assert.equal(containerStyle.transform, "none");
 
-  // Clean up global window
-  globalObj.window = prevWindow;
+  // Runtime preference toggling (reduced on/off): animation count must remain 1 (no replay)
+  controller.setReducedMotion(false);
+  assert.equal(animateCallCount, 1, "Toggling reduced motion after finish must not replay assembly");
 
-  // Destroy cleanup
+  // Fine pointer change: fine -> coarse immediately clears tilt
+  controller.setFinePointer(true);
+  controller.handleMouseMove(100, 100);
+  assert.ok(containerStyle.transform && containerStyle.transform.includes("rotateX"), "Tilt applied for fine pointer");
+  controller.setFinePointer(false);
+  assert.equal(containerStyle.transform, "none", "Coarse pointer must immediately clear tilt");
+
+  // Clean up controller
   controller.destroy();
-  assert.equal(cancelCallCount, 0, "No active animation was running to cancel");
+  assert.equal(controller.getStatus().isDestroyed, true);
+  assert.ok(cancelCallCount >= 1, "Cancel should be invoked when animation finishes or controller is destroyed");
+
+  // Calls after destroy are completely ignored
+  controller.handleMouseMove(100, 100);
+  assert.equal(containerStyle.transform, "none");
+  controller.start();
+  assert.equal(animateCallCount, 1, "Cannot restart animation after destroy");
+});
+
+test("Showcase Motion: controller suppresses deferred assembly when reduced before eligibility", () => {
+  const { createHeroMotionController } = loadComponent<{
+    createHeroMotionController: typeof import("../components/showcase/motion").createHeroMotionController;
+  }>("src/components/showcase/motion.ts");
+
+  const targetStyle: Record<string, string> = {};
+  const containerStyle: Record<string, string> = {};
+  const mockTarget = {
+    style: targetStyle,
+    animate: () => ({ playState: "running", play: () => {}, pause: () => {}, cancel: () => {}, finish: () => {} }),
+  } as unknown as HTMLElement;
+  const mockContainer = {
+    style: containerStyle,
+    getBoundingClientRect: () => ({ left: 0, top: 0, width: 400, height: 500 }),
+  } as unknown as HTMLElement;
+
+  let animateCount = 0;
+  mockTarget.animate = () => {
+    animateCount++;
+    return { playState: "running", play: () => {}, pause: () => {}, cancel: () => {}, finish: () => {} } as unknown as Animation;
+  };
+
+  // Controller initialized while offscreen
+  const controller = createHeroMotionController({
+    getSheet: () => mockTarget,
+    getContainer: () => mockContainer,
+    reducedMotion: false,
+    elementIntersecting: false,
+    documentVisible: true,
+  });
+
+  // User reduces motion before hero ever enters viewport
+  controller.setReducedMotion(true);
+  assert.equal(animateCount, 0);
+
+  // User later restores normal motion, then scrolls into viewport
+  controller.setReducedMotion(false);
+  controller.setElementIntersecting(true);
+  assert.equal(animateCount, 0, "Reduced motion before eligibility permanently settles without deferred start");
+  assert.equal(targetStyle.transform, "none");
+  assert.equal(targetStyle.opacity, "1");
+
+  controller.destroy();
+});
+
+test("Showcase Motion: WAAPI finish cancels fill animation and releases callbacks", () => {
+  const { createHeroMotionController } = loadComponent<{
+    createHeroMotionController: typeof import("../components/showcase/motion").createHeroMotionController;
+  }>("src/components/showcase/motion.ts");
+
+  const targetStyle: Record<string, string> = {};
+  const containerStyle: Record<string, string> = {};
+  const mockTarget = {
+    style: targetStyle,
+  } as unknown as HTMLElement;
+  const mockContainer = {
+    style: containerStyle,
+    getBoundingClientRect: () => ({ left: 0, top: 0, width: 400, height: 500 }),
+  } as unknown as HTMLElement;
+
+  let cancelCallCount = 0;
+  let onFinishAssigned = false;
+  const mockAnimation = {
+    playState: "running",
+    play: () => {},
+    pause: () => {},
+    cancel: () => {
+      cancelCallCount++;
+    },
+    finish: () => {},
+    onfinish: null as (() => void) | null,
+  };
+
+  mockTarget.animate = () => {
+    onFinishAssigned = true;
+    return mockAnimation as unknown as Animation;
+  };
+
+  const controller = createHeroMotionController({
+    getSheet: () => mockTarget,
+    getContainer: () => mockContainer,
+    reducedMotion: false,
+    elementIntersecting: true,
+    documentVisible: true,
+  });
+  controller.start();
+
+  assert.equal(onFinishAssigned, true);
+  // Complete the animation
+  if (mockAnimation.onfinish) {
+    mockAnimation.onfinish();
+  }
+
+  // Verify onfinish handler was detached and animation cancelled to release fill: forwards
+  assert.equal(mockAnimation.onfinish, null, "onfinish callback must be detached");
+  assert.equal(cancelCallCount, 1, "Animation must be cancelled on finish to release forwards fill");
+  assert.equal(targetStyle.transform, "none");
+  assert.equal(targetStyle.opacity, "1");
+
+  controller.destroy();
 });
