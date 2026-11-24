@@ -4,6 +4,8 @@ import React, { useEffect, useRef } from "react";
 import {
   useReducedMotion,
   useFinePointer,
+  prefersReducedMotion,
+  isFinePointer,
   useDocumentVisibility,
   createHeroMotionController,
   type HeroMotionController,
@@ -22,13 +24,14 @@ export function EstimateArtwork({ className = "" }: { className?: string }) {
   });
 
   // Synchronize reduced motion preference changes into the active controller
+  // Always query actual prefersReducedMotion() so stale hydration snapshots never overwrite preferences
   useEffect(() => {
-    controllerRef.current?.setReducedMotion(reducedMotion);
+    controllerRef.current?.setReducedMotion(prefersReducedMotion());
   }, [reducedMotion]);
 
   // Synchronize fine pointer capability changes into the active controller
   useEffect(() => {
-    controllerRef.current?.setFinePointer(finePointer);
+    controllerRef.current?.setFinePointer(isFinePointer());
   }, [finePointer]);
 
   // Initialize lifecycle controller once per component lifetime
@@ -36,8 +39,6 @@ export function EstimateArtwork({ className = "" }: { className?: string }) {
     const controller = createHeroMotionController({
       getContainer: () => containerRef.current,
       getSheet: () => sheetRef.current,
-      // Note: createHeroMotionController reads client prefersReducedMotion() directly
-      // but we also sync the current hook value to ensure coherence.
     });
     controllerRef.current = controller;
 
@@ -58,8 +59,8 @@ export function EstimateArtwork({ className = "" }: { className?: string }) {
       controller.setElementIntersecting(true);
     }
 
-    controller.setReducedMotion(reducedMotion);
-    controller.setFinePointer(finePointer);
+    controller.setReducedMotion(prefersReducedMotion());
+    controller.setFinePointer(isFinePointer());
     controller.start();
 
     return () => {
@@ -67,8 +68,6 @@ export function EstimateArtwork({ className = "" }: { className?: string }) {
       controller.destroy();
       controllerRef.current = null;
     };
-    // Deliberately empty dependencies: exactly one controller instance per component lifetime
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {

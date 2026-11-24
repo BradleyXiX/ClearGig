@@ -566,11 +566,9 @@ test("Showcase Motion: Approach and ProductSurfaces preserve immediate readabili
   assert.match(productHtml, /Website refresh/);
   assert.match(productHtml, /Cloud infrastructure audit/);
 
-  // Initial SSR / no-JS markup must be settled (opacity-100 translate-y-0)
-  assert.match(productHtml, /opacity-100 translate-y-0/);
-  assert.match(productHtml, /transition-\[opacity,transform\]/);
-  assert.match(productHtml, /motion-reduce:transition-none/);
-  assert.match(productHtml, /motion-reduce:transform-none/);
+  // Product surfaces preview uses statically settled composition without layout shift or hidden state
+  assert.match(productHtml, /grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 mt-12 sm:mt-16 items-start/);
+  assert.doesNotMatch(productHtml, /opacity-0/);
 });
 
 test("Showcase Motion: DocumentStory and Questions include motion-reduce overrides", () => {
@@ -833,4 +831,64 @@ test("Showcase Motion: WAAPI finish cancels fill animation and releases callback
   assert.equal(targetStyle.opacity, "1");
 
   controller.destroy();
+});
+
+test("Showcase Motion: mount effect initializes from actual media-query and resists false hydration snapshots", () => {
+  const { createHeroMotionController } = loadComponent<{
+    createHeroMotionController: typeof import("../components/showcase/motion").createHeroMotionController;
+  }>("src/components/showcase/motion.ts");
+
+  const targetStyle: Record<string, string> = {};
+  const containerStyle: Record<string, string> = {};
+  let animateCallCount = 0;
+
+  const mockTarget = {
+    style: targetStyle,
+    animate: () => {
+      animateCallCount++;
+      return { playState: "running", play: () => {}, pause: () => {}, cancel: () => {}, finish: () => {} } as unknown as Animation;
+    },
+  } as unknown as HTMLElement;
+  const mockContainer = {
+    style: containerStyle,
+    getBoundingClientRect: () => ({ left: 0, top: 0, width: 400, height: 500 }),
+  } as unknown as HTMLElement;
+
+  // Simulate environment where prefers-reduced-motion is TRUE in window.matchMedia
+  const globalObj = globalThis as unknown as {
+    window?: { matchMedia: (query: string) => { matches: boolean } };
+  };
+  const prevWindow = globalObj.window;
+
+  try {
+    globalObj.window = {
+      matchMedia: (query: string) => ({
+        matches: query.includes("prefers-reduced-motion: reduce"),
+      }),
+    };
+
+    // Controller created once per lifetime
+    const controller = createHeroMotionController({
+      getContainer: () => mockContainer,
+      getSheet: () => mockTarget,
+    });
+
+    // Simulate hydration effect:
+    // The component executes:
+    // controller.setReducedMotion(prefersReducedMotion());
+    // instead of passing the stale false hook snapshot.
+    const clientPref = globalObj.window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    controller.setReducedMotion(clientPref);
+    controller.setElementIntersecting(true);
+    controller.start();
+
+    // Verify ZERO animations were started despite being intersecting and mounted
+    assert.equal(animateCallCount, 0, "No animation must start when client preference is reduced motion");
+    assert.equal(targetStyle.opacity, "1");
+    assert.equal(targetStyle.transform, "none");
+
+    controller.destroy();
+  } finally {
+    globalObj.window = prevWindow;
+  }
 });

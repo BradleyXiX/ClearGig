@@ -71,37 +71,37 @@ const FEATURES: Array<{
   topic: string;
   description: string;
 }> = [
-  {
-    key: "scope",
-    title: "Keep scope visible",
-    topic: "Line-item categories & workstreams",
-    description:
-      "Break projects into explicit, observable workstreams. Every deliverable and rate category is accounted for before work begins.",
-  },
-  {
-    key: "recurring",
-    title: "Separate recurring costs",
-    topic: "Monthly vs one-time structure",
-    description:
-      "Isolate ongoing maintenance, cloud subscriptions and retained support from one-time milestone commitments.",
-  },
-  {
-    key: "adjustments",
-    title: "Review adjustments",
-    topic: "Contingency & margin allowances",
-    description:
-      "Apply transparent risk allowances and contingency factors without disguising them inside labor line items.",
-  },
-  {
-    key: "document",
-    title: "Prepare a document",
-    topic: "Print & PDF export workflow",
-    description:
-      "Export considered estimates and FinOps audit summaries directly via browser print or PDF for client review.",
-  },
-];
+    {
+      key: "scope",
+      title: "Keep scope visible",
+      topic: "Line-item categories & workstreams",
+      description:
+        "Break projects into explicit, observable workstreams. Every deliverable and rate category is accounted for before work begins.",
+    },
+    {
+      key: "recurring",
+      title: "Separate recurring costs",
+      topic: "Monthly vs one-time structure",
+      description:
+        "Isolate ongoing maintenance, cloud subscriptions and retained support from one-time milestone commitments.",
+    },
+    {
+      key: "adjustments",
+      title: "Review adjustments",
+      topic: "Contingency & margin allowances",
+      description:
+        "Apply transparent risk allowances and contingency factors without disguising them inside labor line items.",
+    },
+    {
+      key: "document",
+      title: "Prepare a document",
+      topic: "Print & PDF export workflow",
+      description:
+        "Export considered estimates and FinOps audit summaries directly via browser print or PDF for client review.",
+    },
+  ];
 
-const emptySubscribe = () => () => {};
+const emptySubscribe = () => () => { };
 
 export function ProductSurfaces() {
   const [activeFeature, setActiveFeature] = useState<FeatureKey>(null);
@@ -182,9 +182,8 @@ export function ProductSurfaces() {
             transitionDuration: `${MOTION.SECTION_REVEAL_DURATION}ms`,
             transitionTimingFunction: MOTION.EASE_CONSIDERED,
           }}
-          className={`grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 mt-12 sm:mt-16 items-start transform-gpu transition-[opacity,transform] motion-reduce:transition-none motion-reduce:transform-none ${
-            isSettled ? "opacity-100 translate-y-0" : "opacity-95 translate-y-4"
-          }`}
+          className={`grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 mt-12 sm:mt-16 items-start transform-gpu transition-[opacity,transform] motion-reduce:transition-none motion-reduce:transform-none ${isSettled ? "opacity-100 translate-y-0" : "opacity-95 translate-y-4"
+            }`}
         >
           {/* 8/12 Columns: DOM Dashboard Preview */}
           <div
@@ -240,13 +239,12 @@ export function ProductSurfaces() {
                     return (
                       <tr
                         key={proj.id}
-                        className={`transition-colors duration-150 ${
-                          isDocumentHighlighted && proj.type === "Estimate"
-                            ? "bg-accent-wash/60"
-                            : isScopeHighlighted
+                        className={`transition-colors duration-150 ${isDocumentHighlighted && proj.type === "Estimate"
+                          ? "bg-accent-wash/60"
+                          : isScopeHighlighted
                             ? "bg-paper-raised"
                             : "hover:bg-paper-raised/80"
-                        }`}
+                          }`}
                       >
                         <td className="py-3.5 pr-4">
                           <div className="font-sans font-semibold text-sm text-ink tracking-tight">
@@ -257,11 +255,10 @@ export function ProductSurfaces() {
 
                         <td className="py-3.5 px-3">
                           <span
-                            className={`inline-block px-2 py-0.5 rounded-control font-medium border text-xs transition-colors duration-150 ${
-                              proj.type === "Estimate"
-                                ? "bg-paper border-rule text-ink"
-                                : "bg-brass/10 border-brass/30 text-brass-ink"
-                            } ${isDocumentHighlighted ? "ring-1 ring-forest font-semibold" : ""}`}
+                            className={`inline-block px-2 py-0.5 rounded-control font-medium border text-xs transition-colors duration-150 ${proj.type === "Estimate"
+                              ? "bg-paper border-rule text-ink"
+                              : "bg-brass/10 border-brass/30 text-brass-ink"
+                              } ${isDocumentHighlighted ? "ring-1 ring-forest font-semibold" : ""}`}
                           >
                             {proj.type}
                           </span>
@@ -269,28 +266,25 @@ export function ProductSurfaces() {
 
                         <td className="py-3.5 px-3 space-y-1">
                           <div
-                            className={`font-mono text-xs transition-colors duration-150 ${
-                              isScopeHighlighted ? "text-forest font-semibold" : "text-ink"
-                            }`}
+                            className={`font-mono text-xs transition-colors duration-150 ${isScopeHighlighted ? "text-forest font-semibold" : "text-ink"
+                              }`}
                           >
                             {proj.scope}
                           </div>
                           <div className="flex flex-wrap items-center gap-1.5 text-xs text-ink-muted">
                             <span
-                              className={`px-1.5 py-0.5 rounded-control transition-colors duration-150 ${
-                                isRecurringHighlighted
-                                  ? "bg-forest text-on-dark font-medium"
-                                  : "bg-paper border border-rule/70"
-                              }`}
+                              className={`px-1.5 py-0.5 rounded-control transition-colors duration-150 ${isRecurringHighlighted
+                                ? "bg-forest text-on-dark font-medium"
+                                : "bg-paper border border-rule/70"
+                                }`}
                             >
                               {proj.structure}
                             </span>
                             <span
-                              className={`px-1.5 py-0.5 rounded-control transition-colors duration-150 ${
-                                isAdjustmentsHighlighted
-                                  ? "bg-brass-ink text-on-dark font-medium"
-                                  : "bg-paper border border-rule/70"
-                              }`}
+                              className={`px-1.5 py-0.5 rounded-control transition-colors duration-150 ${isAdjustmentsHighlighted
+                                ? "bg-brass-ink text-on-dark font-medium"
+                                : "bg-paper border border-rule/70"
+                                }`}
                             >
                               {proj.adjustment}
                             </span>
@@ -299,13 +293,12 @@ export function ProductSurfaces() {
 
                         <td className="py-3.5 pl-3 text-right">
                           <span
-                            className={`inline-block px-2 py-0.5 rounded-control text-xs font-semibold uppercase tracking-wider ${
-                              proj.statusTone === "forest"
-                                ? "bg-forest text-on-dark"
-                                : proj.statusTone === "brass"
+                            className={`inline-block px-2 py-0.5 rounded-control text-xs font-semibold uppercase tracking-wider ${proj.statusTone === "forest"
+                              ? "bg-forest text-on-dark"
+                              : proj.statusTone === "brass"
                                 ? "bg-brass/20 text-brass-ink border border-brass/40"
                                 : "bg-paper border border-rule text-ink-muted"
-                            }`}
+                              }`}
                           >
                             {proj.status}
                           </span>
@@ -351,11 +344,10 @@ export function ProductSurfaces() {
                     onMouseLeave={() => setActiveFeature(null)}
                     onFocus={() => setActiveFeature(feat.key)}
                     onBlur={() => setActiveFeature(null)}
-                    className={`p-3.5 rounded-card border transition-colors duration-150 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-forest ${
-                      isActive
-                        ? "bg-paper-raised border-forest shadow-sm"
-                        : "bg-paper-sunken/40 border-rule hover:border-rule-strong"
-                    }`}
+                    className={`p-3.5 rounded-card border transition-colors duration-150 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-forest ${isActive
+                      ? "bg-paper-raised border-forest shadow-sm"
+                      : "bg-paper-sunken/40 border-rule hover:border-rule-strong"
+                      }`}
                   >
                     <div className="flex items-center justify-between text-xs font-mono mb-1">
                       <span className="text-ink-muted font-medium">0{index + 1}</span>
