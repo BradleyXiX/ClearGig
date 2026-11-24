@@ -107,7 +107,18 @@ async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> 
     }
     throw new ApiError(res.status, message, code);
   }
-  return res.json();
+
+  // Handle 204 No Content or responses with empty bodies safely
+  if (res.status === 204) {
+    return undefined as unknown as T;
+  }
+
+  const text = await res.text();
+  if (!text) {
+    return undefined as unknown as T;
+  }
+
+  return JSON.parse(text) as T;
 }
 
 export const api = {
@@ -124,7 +135,7 @@ export const api = {
 
   async updateProject(id: string, data: UpdateProjectDTO): Promise<Project> {
     return fetchAPI<Project>(`/projects/${id}`, {
-      method: 'PUT',
+      method: 'PATCH',
       body: JSON.stringify(data),
     });
   },
