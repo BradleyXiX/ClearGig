@@ -33,7 +33,9 @@ The following libraries and patterns remain **strictly forbidden**:
 ### 3. Typography, Motion, Icons & Dependencies
 - Typefaces: Geist Sans for headings, navigation, controls, and body; Geist Mono for all tabular figures, monetary totals, dates, and codes. (Showcase-only display accent: system serif).
 - Numbers: Right-aligned with `font-mono tabular-nums`.
-- Motion: Bounded native CSS/WAAPI/IntersectionObserver only (max 400ms cubic-bezier, scoped to `transform` and `opacity`). No `transition-all`. Respect `prefers-reduced-motion`.
+- Motion: Bounded native CSS/WAAPI/IntersectionObserver only, scoped to `transform` and `opacity`. No `transition-all`. Respect `prefers-reduced-motion` at initial load and runtime. One owner per animated property, cleanly aborting listeners/effects on unmount or offscreen.
+  - Local app/control transitions: normally <=200ms, with 400ms as an upper bound (`cubic-bezier(0.22, 1, 0.36, 1)`).
+  - Showcase hero paper sequence exception: finite 650–800ms assembly sequence as specified in `design.md`. Text, headings, and CTA button availability must never be delayed by this sequence.
 - Icons: `lucide-react` with 1.5px stroke, 20px size, inheriting `currentColor`. Do not migrate to Phosphor or add icon packages.
 - Dependencies: No new dependencies may be added. The removed packages (three, lenis, gsap, etc.) must never be reinstalled.
 
