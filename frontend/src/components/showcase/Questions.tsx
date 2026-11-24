@@ -48,7 +48,7 @@ export function Questions() {
             <summary className="flex items-center justify-between gap-4 text-base sm:text-lg font-sans font-medium text-ink list-none outline-none focus-visible:ring-2 focus-visible:ring-forest focus-visible:ring-offset-2 rounded-control select-none">
               <span>{faq.question}</span>
               <span
-                className="font-mono text-sm text-ink-muted transition-transform duration-150 group-open:rotate-45 shrink-0 px-1"
+                className="font-mono text-sm text-ink-muted transition-transform duration-150 group-open:rotate-45 shrink-0 px-1 motion-reduce:transition-none motion-reduce:transform-none motion-reduce:group-open:transform-none"
                 aria-hidden="true"
               >
                 +

@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useSyncExternalStore } from "react";
 import { DocumentStory } from "./DocumentStory";
-import { useReducedMotion } from "./motion";
+import { MOTION, useReducedMotion } from "./motion";
 
 type FeatureKey = "scope" | "recurring" | "adjustments" | "document" | null;
 
@@ -101,8 +101,18 @@ const FEATURES: Array<{
   },
 ];
 
+const emptySubscribe = () => () => {};
+
 export function ProductSurfaces() {
   const [activeFeature, setActiveFeature] = useState<FeatureKey>(null);
+  // Client-mounted state determines if animation state can be active (for progressive enhancement)
+  // Initial SSR renders settled (opacity-100 translate-y-0) via getServerSnapshot: false
+  // Client renders mounted via getSnapshot: true
+  const isClient = useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false
+  );
   const [isRevealed, setIsRevealed] = useState<boolean>(false);
   const previewRef = useRef<HTMLDivElement>(null);
   const reducedMotion = useReducedMotion();
@@ -110,7 +120,7 @@ export function ProductSurfaces() {
   // Decorative preview reveal: runs once when entering viewport, <=16px / 350-450ms
   // Asynchronously updates state only upon intersection observation, never synchronously in effect body
   useEffect(() => {
-    if (reducedMotion || typeof IntersectionObserver === "undefined") {
+    if (!isClient || reducedMotion || typeof IntersectionObserver === "undefined") {
       return;
     }
 
@@ -131,9 +141,11 @@ export function ProductSurfaces() {
 
     observer.observe(el);
     return () => observer.disconnect();
-  }, [reducedMotion]);
+  }, [isClient, reducedMotion]);
 
-  const showSettled = isRevealed || reducedMotion;
+  // For no-JS / initial SSR / reduced-motion: always settled (opacity-100 translate-y-0)
+  // Only when client-mounted and reducedMotion is false does it animate from offset to settled upon intersection
+  const isSettled = !isClient || reducedMotion || isRevealed;
 
   return (
     <section
@@ -164,8 +176,12 @@ export function ProductSurfaces() {
         {/* Asymmetric 8/12 and 4/12 Composition (Decorative preview reveal owner) */}
         <div
           ref={previewRef}
-          className={`grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 mt-12 sm:mt-16 items-start transform-gpu transition-opacity duration-300 transition-transform duration-300 ${
-            showSettled ? "opacity-100 translate-y-0" : "opacity-90 translate-y-4"
+          style={{
+            transitionDuration: `${MOTION.SECTION_REVEAL_DURATION}ms`,
+            transitionTimingFunction: MOTION.EASE_CONSIDERED,
+          }}
+          className={`grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 mt-12 sm:mt-16 items-start transform-gpu transition-[opacity,transform] motion-reduce:transition-none motion-reduce:transform-none ${
+            isSettled ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
           }`}
         >
           {/* 8/12 Columns: DOM Dashboard Preview */}

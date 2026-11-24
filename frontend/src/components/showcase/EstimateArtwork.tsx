@@ -2,87 +2,65 @@
 
 import React, { useEffect, useRef } from "react";
 import {
-  MOTION,
   useReducedMotion,
-  usePageVisibility,
-  isFinePointer,
-  computeTilt,
+  useDocumentVisibility,
+  createHeroMotionController,
+  type HeroMotionController,
 } from "./motion";
 
 export function EstimateArtwork({ className = "" }: { className?: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sheetRef = useRef<HTMLDivElement>(null);
-  const animationRef = useRef<Animation | null>(null);
+  const controllerRef = useRef<HeroMotionController | null>(null);
   const reducedMotion = useReducedMotion();
 
-  // Pause/resume animation on document visibility change
-  usePageVisibility((visible) => {
-    if (!animationRef.current) return;
-    if (visible && animationRef.current.playState === "paused") {
-      animationRef.current.play();
-    } else if (!visible && animationRef.current.playState === "running") {
-      animationRef.current.pause();
-    }
+  // Document visibility gate (pauses when hidden/backgrounded)
+  useDocumentVisibility((visible) => {
+    controllerRef.current?.setDocumentVisible(visible);
   });
 
-  // Hero paper assembly: Finite 650–800ms WAAPI animation
+  // Initialize lifecycle controller and element intersection gate
   useEffect(() => {
-    const sheetEl = sheetRef.current;
-    if (!sheetEl || reducedMotion) {
-      if (sheetEl) {
-        sheetEl.style.transform = "none";
-        sheetEl.style.opacity = "1";
-      }
-      return;
-    }
+    const controller = createHeroMotionController({
+      getContainer: () => containerRef.current,
+      getSheet: () => sheetRef.current,
+      reducedMotion,
+    });
+    controllerRef.current = controller;
 
-    try {
-      const anim = sheetEl.animate(
-        [
-          {
-            transform: `translateY(${MOTION.HERO_ASSEMBLY_TRAVEL}px) rotate(-${MOTION.HERO_ASSEMBLY_ROTATION}deg)`,
-            opacity: 0.8,
-          },
-          {
-            transform: "translateY(0px) rotate(0deg)",
-            opacity: 1,
-          },
-        ],
-        {
-          duration: MOTION.HERO_ASSEMBLY_DURATION,
-          easing: MOTION.EASE_CONSIDERED,
-          fill: "forwards",
-        }
+    let observer: IntersectionObserver | null = null;
+
+    if (containerRef.current && typeof IntersectionObserver !== "undefined") {
+      observer = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            controller.setElementIntersecting(entry.isIntersecting);
+          }
+        },
+        { threshold: 0.1 }
       );
-
-      animationRef.current = anim;
-
-      return () => {
-        anim.cancel();
-        animationRef.current = null;
-      };
-    } catch {
-      // Fallback for environments without WAAPI
-      sheetEl.style.transform = "none";
-      sheetEl.style.opacity = "1";
+      observer.observe(containerRef.current);
+    } else {
+      // Fallback: if IntersectionObserver is unavailable, mark intersecting
+      controller.setElementIntersecting(true);
     }
+
+    controller.setReducedMotion(reducedMotion);
+    controller.start();
+
+    return () => {
+      observer?.disconnect();
+      controller.destroy();
+      controllerRef.current = null;
+    };
   }, [reducedMotion]);
 
-  // Art tilt: Fine pointer only, max 2deg, no React state re-renders per frame
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (reducedMotion || !isFinePointer() || !containerRef.current) return;
-
-    const rect = containerRef.current.getBoundingClientRect();
-    const { rotateX, rotateY } = computeTilt(e.clientX, e.clientY, rect, MOTION.TILT_MAX_DEG);
-
-    containerRef.current.style.transform = `perspective(1000px) rotateX(${rotateX.toFixed(
-      2
-    )}deg) rotateY(${rotateY.toFixed(2)}deg)`;
+    controllerRef.current?.handleMouseMove(e.clientX, e.clientY);
   };
 
   const handleMouseLeave = () => {
-    if (!containerRef.current) return;
-    containerRef.current.style.transform = "perspective(1000px) rotateX(0deg) rotateY(0deg)";
+    controllerRef.current?.handleMouseLeave();
   };
 
   return (
@@ -90,7 +68,7 @@ export function EstimateArtwork({ className = "" }: { className?: string }) {
       ref={containerRef}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
-      className={`relative w-full overflow-hidden rounded-panel border border-rule-strong bg-dark-canvas text-on-dark shadow-md transform-gpu transition-transform duration-200 ${className}`.trim()}
+      className={`relative w-full overflow-hidden rounded-panel border border-rule-strong bg-dark-canvas text-on-dark shadow-md transform-gpu motion-reduce:transition-none motion-reduce:transform-none ${className}`.trim()}
       style={{
         aspectRatio: "5 / 6",
         transformStyle: "preserve-3d",
@@ -142,7 +120,7 @@ export function EstimateArtwork({ className = "" }: { className?: string }) {
       {/* Floating HTML estimate sheet at lower-left (Hero Paper Assembly owner) */}
       <div
         ref={sheetRef}
-        className="absolute bottom-3 left-3 right-3 sm:right-auto sm:bottom-5 sm:left-5 z-10 sm:max-w-xs w-auto transform-gpu"
+        className="absolute bottom-3 left-3 right-3 sm:right-auto sm:bottom-5 sm:left-5 z-10 sm:max-w-xs w-auto transform-gpu motion-reduce:transition-none motion-reduce:transform-none"
         style={{ willChange: "transform, opacity" }}
       >
         <div className="bg-paper text-ink p-4 sm:p-5 rounded-panel border border-rule shadow-lg">

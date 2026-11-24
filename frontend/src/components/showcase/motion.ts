@@ -43,6 +43,14 @@ export function isFinePointer(): boolean {
   return window.matchMedia("(pointer: fine)").matches;
 }
 
+/**
+ * Check if the document is currently visible (SSR-safe).
+ */
+export function isDocumentVisible(): boolean {
+  if (typeof document === "undefined") return true;
+  return document.visibilityState === "visible";
+}
+
 function subscribeReducedMotion(callback: () => void) {
   if (typeof window === "undefined" || !window.matchMedia) return () => {};
   const mql = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -51,8 +59,7 @@ function subscribeReducedMotion(callback: () => void) {
 }
 
 function getReducedMotionSnapshot(): boolean {
-  if (typeof window === "undefined" || !window.matchMedia) return false;
-  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  return prefersReducedMotion();
 }
 
 function getReducedMotionServerSnapshot(): boolean {
@@ -61,7 +68,7 @@ function getReducedMotionServerSnapshot(): boolean {
 
 /**
  * React hook tracking prefers-reduced-motion state via useSyncExternalStore.
- * Safe for React 19 hydration and SSR.
+ * Responds to runtime changes without cascading render warnings.
  */
 export function useReducedMotion(): boolean {
   return useSyncExternalStore(
@@ -72,9 +79,9 @@ export function useReducedMotion(): boolean {
 }
 
 /**
- * React hook tracking document visibility to pause animations when hidden/offscreen.
+ * React hook tracking document visibility specifically (visibilitychange event).
  */
-export function usePageVisibility(onChange?: (visible: boolean) => void): boolean {
+export function useDocumentVisibility(onChange?: (visible: boolean) => void): boolean {
   const cbRef = useRef(onChange);
 
   useEffect(() => {
@@ -120,4 +127,227 @@ export function computeTilt(
   const rotateY = Object.is(rawRotateY, -0) ? 0 : rawRotateY;
 
   return { rotateX, rotateY };
+}
+
+export interface HeroMotionConfig {
+  getContainer: () => HTMLElement | null;
+  getSheet: () => HTMLElement | null;
+  onFinished?: () => void;
+  reducedMotion?: boolean;
+  documentVisible?: boolean;
+  elementIntersecting?: boolean;
+}
+
+export interface HeroMotionController {
+  start(): void;
+  setDocumentVisible(visible: boolean): void;
+  setElementIntersecting(intersecting: boolean): void;
+  setReducedMotion(reduced: boolean): void;
+  handleMouseMove(clientX: number, clientY: number): void;
+  handleMouseLeave(): void;
+  destroy(): void;
+  getStatus(): {
+    isDocumentVisible: boolean;
+    isElementIntersecting: boolean;
+    isReducedMotion: boolean;
+    hasStarted: boolean;
+    hasFinished: boolean;
+    isPlaying: boolean;
+  };
+}
+
+/**
+ * Controller governing hero paper assembly and fine-pointer tilt.
+ * Gates WAAPI execution by both document visibility and element intersection.
+ * Settle immediately under reduced motion and prevents replaying finite sequences.
+ */
+export function createHeroMotionController(config: HeroMotionConfig): HeroMotionController {
+  let isDocumentVisibleState =
+    config.documentVisible !== undefined ? config.documentVisible : isDocumentVisible();
+  let isElementIntersectingState =
+    config.elementIntersecting !== undefined ? config.elementIntersecting : false;
+  let isReducedMotionState =
+    config.reducedMotion !== undefined ? config.reducedMotion : prefersReducedMotion();
+
+  let hasStartedState = false;
+  let hasFinishedState = false;
+  let activeAnimation: Animation | null = null;
+
+  const settleSheetImmediately = () => {
+    const sheet = config.getSheet();
+    if (sheet) {
+      sheet.style.transform = "none";
+      sheet.style.opacity = "1";
+    }
+  };
+
+  const clearTiltImmediately = () => {
+    const container = config.getContainer();
+    if (container) {
+      container.style.transition = "none";
+      container.style.transform = "none";
+    }
+  };
+
+  const checkAndTrigger = () => {
+    if (isReducedMotionState) {
+      settleSheetImmediately();
+      clearTiltImmediately();
+      return;
+    }
+
+    if (hasFinishedState) return;
+
+    const canPlay = isDocumentVisibleState && isElementIntersectingState;
+
+    if (activeAnimation) {
+      if (canPlay && activeAnimation.playState === "paused") {
+        activeAnimation.play();
+      } else if (!canPlay && activeAnimation.playState === "running") {
+        activeAnimation.pause();
+      }
+      return;
+    }
+
+    if (canPlay && !hasStartedState) {
+      startAnimation();
+    }
+  };
+
+  const startAnimation = () => {
+    if (hasStartedState || hasFinishedState || isReducedMotionState) {
+      settleSheetImmediately();
+      return;
+    }
+
+    const sheet = config.getSheet();
+    if (!sheet) return;
+
+    hasStartedState = true;
+
+    try {
+      if (typeof sheet.animate !== "function") {
+        settleSheetImmediately();
+        hasFinishedState = true;
+        config.onFinished?.();
+        return;
+      }
+
+      const anim = sheet.animate(
+        [
+          {
+            transform: `translateY(${MOTION.HERO_ASSEMBLY_TRAVEL}px) rotate(-${MOTION.HERO_ASSEMBLY_ROTATION}deg)`,
+            opacity: 0.8,
+          },
+          {
+            transform: "translateY(0px) rotate(0deg)",
+            opacity: 1,
+          },
+        ],
+        {
+          duration: MOTION.HERO_ASSEMBLY_DURATION,
+          easing: MOTION.EASE_CONSIDERED,
+          fill: "forwards",
+        }
+      );
+
+      activeAnimation = anim;
+
+      anim.onfinish = () => {
+        hasFinishedState = true;
+        activeAnimation = null;
+        settleSheetImmediately();
+        config.onFinished?.();
+      };
+    } catch {
+      settleSheetImmediately();
+      hasFinishedState = true;
+      activeAnimation = null;
+      config.onFinished?.();
+    }
+  };
+
+  // If already reduced motion upon initialization, ensure settled layout
+  if (isReducedMotionState) {
+    settleSheetImmediately();
+    clearTiltImmediately();
+  }
+
+  return {
+    start() {
+      checkAndTrigger();
+    },
+
+    setDocumentVisible(visible: boolean) {
+      isDocumentVisibleState = visible;
+      checkAndTrigger();
+    },
+
+    setElementIntersecting(intersecting: boolean) {
+      isElementIntersectingState = intersecting;
+      checkAndTrigger();
+    },
+
+    setReducedMotion(reduced: boolean) {
+      const wasReduced = isReducedMotionState;
+      isReducedMotionState = reduced;
+
+      if (reduced) {
+        if (activeAnimation) {
+          activeAnimation.cancel();
+          activeAnimation = null;
+        }
+        settleSheetImmediately();
+        clearTiltImmediately();
+      } else if (wasReduced && !hasStartedState && !hasFinishedState) {
+        checkAndTrigger();
+      }
+    },
+
+    handleMouseMove(clientX: number, clientY: number) {
+      if (isReducedMotionState || !isFinePointer()) return;
+
+      const container = config.getContainer();
+      if (!container) return;
+
+      const rect = container.getBoundingClientRect();
+      const { rotateX, rotateY } = computeTilt(clientX, clientY, rect, MOTION.TILT_MAX_DEG);
+
+      container.style.transition = "";
+      container.style.transform = `perspective(1000px) rotateX(${rotateX.toFixed(
+        2
+      )}deg) rotateY(${rotateY.toFixed(2)}deg)`;
+    },
+
+    handleMouseLeave() {
+      const container = config.getContainer();
+      if (!container) return;
+
+      if (isReducedMotionState) {
+        container.style.transition = "none";
+        container.style.transform = "none";
+      } else {
+        container.style.transition = `transform ${MOTION.TILT_SETTLE_MS}ms ${MOTION.EASE_CONSIDERED}`;
+        container.style.transform = "perspective(1000px) rotateX(0deg) rotateY(0deg)";
+      }
+    },
+
+    destroy() {
+      if (activeAnimation) {
+        activeAnimation.cancel();
+        activeAnimation = null;
+      }
+    },
+
+    getStatus() {
+      return {
+        isDocumentVisible: isDocumentVisibleState,
+        isElementIntersecting: isElementIntersectingState,
+        isReducedMotion: isReducedMotionState,
+        hasStarted: hasStartedState,
+        hasFinished: hasFinishedState,
+        isPlaying: activeAnimation?.playState === "running",
+      };
+    },
+  };
 }

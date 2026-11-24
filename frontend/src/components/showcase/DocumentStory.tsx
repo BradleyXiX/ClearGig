@@ -24,7 +24,7 @@ export function DocumentStory() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-10 items-stretch">
           {/* Sheet 1: Estimate Document */}
           <article
-            className="bg-paper border border-rule rounded-card p-6 sm:p-8 shadow-sm flex flex-col justify-between space-y-6 sm:space-y-8 transform-gpu lg:-rotate-1 transition-transform duration-200 hover:rotate-0"
+            className="bg-paper border border-rule rounded-card p-6 sm:p-8 shadow-sm flex flex-col justify-between space-y-6 sm:space-y-8 transform-gpu lg:-rotate-1 transition-transform duration-200 hover:rotate-0 motion-reduce:transform-none motion-reduce:transition-none motion-reduce:hover:transform-none"
             aria-label="Sample Estimate Document Anatomy"
           >
             <div className="space-y-6">
@@ -89,7 +89,7 @@ export function DocumentStory() {
 
           {/* Sheet 2: FinOps Scenario Document */}
           <article
-            className="bg-paper border border-rule rounded-card p-6 sm:p-8 shadow-sm flex flex-col justify-between space-y-6 sm:space-y-8 transform-gpu lg:rotate-1 transition-transform duration-200 hover:rotate-0"
+            className="bg-paper border border-rule rounded-card p-6 sm:p-8 shadow-sm flex flex-col justify-between space-y-6 sm:space-y-8 transform-gpu lg:rotate-1 transition-transform duration-200 hover:rotate-0 motion-reduce:transform-none motion-reduce:transition-none motion-reduce:hover:transform-none"
             aria-label="Sample FinOps Audit Scenario Document Anatomy"
           >
             <div className="space-y-6">

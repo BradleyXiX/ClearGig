@@ -565,4 +565,169 @@ test("Showcase Motion: Approach and ProductSurfaces preserve immediate readabili
   assert.match(productHtml, /Sample workspace/);
   assert.match(productHtml, /Website refresh/);
   assert.match(productHtml, /Cloud infrastructure audit/);
+
+  // Initial SSR / no-JS markup must be settled (opacity-100 translate-y-0)
+  assert.match(productHtml, /opacity-100 translate-y-0/);
+  assert.match(productHtml, /transition-\[opacity,transform\]/);
+  assert.match(productHtml, /motion-reduce:transition-none/);
+  assert.match(productHtml, /motion-reduce:transform-none/);
+});
+
+test("Showcase Motion: DocumentStory and Questions include motion-reduce overrides", () => {
+  const { DocumentStory } = loadComponent("src/components/showcase/DocumentStory.tsx");
+  const { Questions } = loadComponent("src/components/showcase/Questions.tsx");
+
+  const docHtml = ReactDOMServer.renderToStaticMarkup(React.createElement(DocumentStory));
+  const questionsHtml = ReactDOMServer.renderToStaticMarkup(React.createElement(Questions));
+
+  // DocumentStory offset sheets disable transform and transition under reduced motion
+  assert.match(docHtml, /motion-reduce:transform-none/);
+  assert.match(docHtml, /motion-reduce:transition-none/);
+  assert.match(docHtml, /motion-reduce:hover:transform-none/);
+
+  // Questions accordion icon disables rotate and transition under reduced motion
+  assert.match(questionsHtml, /motion-reduce:transition-none/);
+  assert.match(questionsHtml, /motion-reduce:transform-none/);
+  assert.match(questionsHtml, /motion-reduce:group-open:transform-none/);
+});
+
+test("Showcase Motion: createHeroMotionController respects reduced motion, gating, and tilt clearing", () => {
+  const { createHeroMotionController } = loadComponent<{
+    createHeroMotionController: typeof import("../components/showcase/motion").createHeroMotionController;
+  }>("src/components/showcase/motion.ts");
+
+  // Track animation calls and target styles
+  const targetStyle: Record<string, string> = {};
+  const containerStyle: Record<string, string> = {};
+
+  const mockTarget = {
+    style: targetStyle,
+    animate: () => mockAnimation,
+  } as unknown as HTMLElement;
+
+  const mockContainer = {
+    style: containerStyle,
+    getBoundingClientRect: () => ({ left: 0, top: 0, width: 400, height: 500 }),
+  } as unknown as HTMLElement;
+
+  let animateCallCount = 0;
+  let playCallCount = 0;
+  let pauseCallCount = 0;
+  let cancelCallCount = 0;
+
+  const mockAnimation = {
+    playState: "running",
+    play: () => {
+      playCallCount++;
+      mockAnimation.playState = "running";
+    },
+    pause: () => {
+      pauseCallCount++;
+      mockAnimation.playState = "paused";
+    },
+    cancel: () => {
+      cancelCallCount++;
+      mockAnimation.playState = "idle";
+    },
+    finish: () => {},
+    onfinish: null as (() => void) | null,
+  };
+
+  mockTarget.animate = () => {
+    animateCallCount++;
+    mockAnimation.playState = "running";
+    return mockAnimation as unknown as Animation;
+  };
+
+  // Case 1: Initial reduced motion -> zero animation created, target immediately settled
+  const reducedController = createHeroMotionController({
+    getSheet: () => mockTarget,
+    getContainer: () => mockContainer,
+    reducedMotion: true,
+    elementIntersecting: true,
+    documentVisible: true,
+  });
+
+  assert.equal(animateCallCount, 0, "No animations should be created when reduced motion is preferred");
+  assert.equal(targetStyle.opacity, "1");
+  assert.equal(targetStyle.transform, "none");
+  reducedController.destroy();
+
+  // Case 2: Standard mode - hidden or offscreen initially -> no animation starts until visible and intersecting
+  const controller = createHeroMotionController({
+    getSheet: () => mockTarget,
+    getContainer: () => mockContainer,
+    reducedMotion: false,
+    elementIntersecting: false,
+    documentVisible: true,
+  });
+
+  assert.equal(animateCallCount, 0, "Should not animate while offscreen");
+
+  // Make visible while still offscreen
+  controller.setDocumentVisible(true);
+  assert.equal(animateCallCount, 0, "Still offscreen, should not animate");
+
+  // Enter viewport -> starts animation
+  controller.setElementIntersecting(true);
+  assert.equal(animateCallCount, 1, "Animation should start once both intersecting and visible");
+  assert.equal(controller.getStatus().isPlaying, true);
+
+  // Tab hidden -> pause animation
+  controller.setDocumentVisible(false);
+  assert.equal(pauseCallCount, 1, "Animation should pause when tab hidden");
+
+  // Tab visible -> resume animation
+  controller.setDocumentVisible(true);
+  assert.equal(playCallCount, 1, "Animation should resume when tab visible");
+
+  // Complete assembly
+  if (mockAnimation.onfinish) {
+    mockAnimation.onfinish();
+  }
+  assert.equal(controller.getStatus().hasFinished, true);
+  assert.equal(controller.getStatus().isPlaying, false);
+
+  // Visibility changes after assembly completion must NOT replay
+  controller.setDocumentVisible(false);
+  controller.setDocumentVisible(true);
+  assert.equal(animateCallCount, 1, "Assembly animation must never replay after completion");
+
+  // Tilt manipulation with fine pointer
+  // Ensure window and matchMedia exist in test runner environment
+  const globalObj = globalThis as unknown as { window?: { matchMedia: (query: string) => unknown } };
+  const prevWindow = globalObj.window;
+  globalObj.window = {
+    matchMedia: (query: string) => ({
+      matches: query.includes("pointer: fine"),
+      media: query,
+      onchange: null,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    }),
+  };
+
+  controller.handleMouseMove(100, 100);
+  assert.ok(containerStyle.transform && containerStyle.transform.includes("rotateX"), "Outer container should have tilt transform");
+
+  // Runtime reduction preference switch -> immediately clears outer tilt without transition delay
+  controller.setReducedMotion(true);
+  assert.equal(containerStyle.transition, "none");
+  assert.equal(containerStyle.transform, "none");
+  assert.equal(targetStyle.opacity, "1");
+  assert.equal(targetStyle.transform, "none");
+
+  // Pointer move while reduced motion is true must not apply tilt
+  controller.handleMouseMove(50, 50);
+  assert.equal(containerStyle.transform, "none");
+
+  // Clean up global window
+  globalObj.window = prevWindow;
+
+  // Destroy cleanup
+  controller.destroy();
+  assert.equal(cancelCallCount, 0, "No active animation was running to cancel");
 });
