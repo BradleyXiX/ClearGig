@@ -44,6 +44,15 @@ function loadComponent<T = Record<string, React.ComponentType<Record<string, unk
     if (id === "./DocumentStory" || id.includes("DocumentStory")) {
       return loadComponent("src/components/showcase/DocumentStory.tsx");
     }
+    if (id === "@/components/showcase/Closing" || id.includes("Closing")) {
+      return loadComponent("src/components/showcase/Closing.tsx");
+    }
+    if (id === "./Questions" || id.includes("Questions")) {
+      return loadComponent("src/components/showcase/Questions.tsx");
+    }
+    if (id === "@/components/showcase/ShowcaseFooter" || id.includes("ShowcaseFooter")) {
+      return loadComponent("src/components/showcase/ShowcaseFooter.tsx");
+    }
     if (id === "./EstimateExample" || id.includes("EstimateExample")) {
       return loadComponent("src/components/showcase/EstimateExample.tsx");
     }
@@ -330,4 +339,119 @@ test("ProductSurfaces & DocumentStory: enforce strict price-free policy", () => 
 
   // Strictly assert no standalone percentage rates (like 15% or 20%)
   assert.doesNotMatch(html, /\b\d+%/);
+});
+
+test("Closing: renders Section 5F two-column layout, headlines, copy, single primary CTA, and secondary workspace link", () => {
+  const { Closing } = loadComponent("src/components/showcase/Closing.tsx");
+  const html = ReactDOMServer.renderToStaticMarkup(React.createElement(Closing));
+
+  // Section id
+  assert.match(html, /id="closing"/);
+
+  // Eyebrow and headlines
+  assert.match(html, /GETTING STARTED/);
+  assert.match(html, /Make the next proposal/);
+  assert.match(html, /a considered one\./);
+  assert.match(html, /font-serif-display/);
+
+  // Copy
+  assert.match(
+    html,
+    /Bring your scope, rates and recurring costs into one considered estimate\./
+  );
+
+  // Single primary CTA with arrow
+  assert.match(html, /href="\/"[^>]*>[\s\S]*?Build an estimate/);
+  assert.match(html, /→/);
+
+  // Secondary workspace link
+  assert.match(html, /href="\/dashboard"[^>]*>[\s\S]*?Open workspace/);
+
+  // No backend contact form, email inputs, or pricing tiers
+  assert.doesNotMatch(html, /<form/i);
+  assert.doesNotMatch(html, /<input/i);
+  assert.doesNotMatch(html, /pricing tier/i);
+});
+
+test("Questions: renders three native details disclosures with exact Section 5F questions and answers", () => {
+  const { Questions } = loadComponent("src/components/showcase/Questions.tsx");
+  const html = ReactDOMServer.renderToStaticMarkup(React.createElement(Questions));
+
+  // Eyebrow and heading
+  assert.match(html, /USEFUL QUESTIONS/);
+  assert.match(html, /Questions before you begin\./);
+
+  // Native HTML details and summary elements
+  assert.match(html, /<details/);
+  assert.match(html, /<summary/);
+
+  // Question 1: What can I estimate?
+  assert.match(html, /What can I estimate\?/);
+  assert.match(
+    html,
+    /Software project work by category, hourly scope and rates, one-time costs and recurring monthly items\./
+  );
+
+  // Question 2: How do documents work?
+  assert.match(html, /How do documents work\?/);
+  assert.match(
+    html,
+    /Open the saved project&#x27;s estimate or audit document, then use browser print or save-to-PDF\. No claim of generated legal contracts or e-signing\.|Open the saved project's estimate or audit document, then use browser print or save-to-PDF\. No claim of generated legal contracts or e-signing\./
+  );
+
+  // Question 3: Are audit savings guaranteed?
+  assert.match(html, /Are audit savings guaranteed\?/);
+  assert.match(
+    html,
+    /No\. The FinOps view models a scenario from the supplied spend and savings-rate assumptions; it does not verify cloud-account savings\./
+  );
+});
+
+test("ShowcaseFooter: renders dark ink field, light wordmark, phrase, authentic navigation, and copyright", () => {
+  const { ShowcaseFooter } = loadComponent("src/components/showcase/ShowcaseFooter.tsx");
+  const html = ReactDOMServer.renderToStaticMarkup(React.createElement(ShowcaseFooter));
+
+  // Dark canvas styling
+  assert.match(html, /bg-dark-canvas/);
+  assert.match(html, /text-on-dark/);
+
+  // Light wordmark and core phrase
+  assert.match(html, /ClearGig/);
+  assert.match(html, /Clarity before commitment\./);
+
+  // Authentic links
+  assert.match(html, /href="\/"[^>]*>[\s\S]*?New estimate/);
+  assert.match(html, /href="\/dashboard"[^>]*>[\s\S]*?Workspace/);
+  assert.match(html, /href="#approach"[^>]*>[\s\S]*?The approach/);
+  assert.match(html, /href="#workspace"[^>]*>[\s\S]*?Inside ClearGig/);
+
+  // Copyright and disclosure (no fake legal links or licensing claims)
+  assert.match(html, /© 2026 ClearGig\. All rights reserved\./);
+  assert.match(html, /Workflow preview · No pricing shown\./);
+  assert.doesNotMatch(html, /privacy policy/i);
+  assert.doesNotMatch(html, /terms of service/i);
+  assert.doesNotMatch(html, /supportgenius/i);
+});
+
+test("Showcase Closing, Questions & Footer: enforce strict price-free policy", () => {
+  const { Closing } = loadComponent("src/components/showcase/Closing.tsx");
+  const { ShowcaseFooter } = loadComponent("src/components/showcase/ShowcaseFooter.tsx");
+
+  const closingHtml = ReactDOMServer.renderToStaticMarkup(React.createElement(Closing));
+  const footerHtml = ReactDOMServer.renderToStaticMarkup(React.createElement(ShowcaseFooter));
+
+  for (const html of [closingHtml, footerHtml]) {
+    // Strictly assert no currency symbols
+    assert.doesNotMatch(html, /[$€£]/);
+
+    // Strictly assert no hourly rates
+    assert.doesNotMatch(html, /\/hr/i);
+    assert.doesNotMatch(html, /\/hour/i);
+
+    // Strictly assert no monetary values or currency codes
+    assert.doesNotMatch(html, /\b\d+(\.\d{2})?\s*(USD|EUR|GBP)\b/i);
+
+    // Strictly assert no standalone percentage rates
+    assert.doesNotMatch(html, /\b\d+%/);
+  }
 });

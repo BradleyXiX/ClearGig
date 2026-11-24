@@ -4,6 +4,8 @@ import { ShowcaseNav } from "@/components/showcase/ShowcaseNav";
 import { Hero } from "@/components/showcase/Hero";
 import { Approach } from "@/components/showcase/Approach";
 import { ProductSurfaces } from "@/components/showcase/ProductSurfaces";
+import { Closing } from "@/components/showcase/Closing";
+import { ShowcaseFooter } from "@/components/showcase/ShowcaseFooter";
 
 export const metadata: Metadata = {
   title: "ClearGig — Project Estimates, Considered",
@@ -30,15 +32,11 @@ export default function ShowcasePage() {
         <Hero />
         <Approach />
         <ProductSurfaces />
+        <Closing />
       </main>
 
-      {/* Minimal static showcase footer */}
-      <footer className="w-full bg-dark-canvas text-on-dark-muted py-8 border-t border-rule-strong no-print">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-mono">
-          <div>ClearGig · Clarity before commitment.</div>
-          <div>Workflow preview · No pricing shown.</div>
-        </div>
-      </footer>
+      {/* Complete Considered Work showcase footer */}
+      <ShowcaseFooter />
     </div>
   );
 }
