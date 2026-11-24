@@ -1,10 +1,101 @@
-import React from "react";
+"use client";
+
+import React, { useEffect, useRef } from "react";
+import {
+  MOTION,
+  useReducedMotion,
+  usePageVisibility,
+  isFinePointer,
+  computeTilt,
+} from "./motion";
 
 export function EstimateArtwork({ className = "" }: { className?: string }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const animationRef = useRef<Animation | null>(null);
+  const reducedMotion = useReducedMotion();
+
+  // Pause/resume animation on document visibility change
+  usePageVisibility((visible) => {
+    if (!animationRef.current) return;
+    if (visible && animationRef.current.playState === "paused") {
+      animationRef.current.play();
+    } else if (!visible && animationRef.current.playState === "running") {
+      animationRef.current.pause();
+    }
+  });
+
+  // Hero paper assembly: Finite 650–800ms WAAPI animation
+  useEffect(() => {
+    const sheetEl = sheetRef.current;
+    if (!sheetEl || reducedMotion) {
+      if (sheetEl) {
+        sheetEl.style.transform = "none";
+        sheetEl.style.opacity = "1";
+      }
+      return;
+    }
+
+    try {
+      const anim = sheetEl.animate(
+        [
+          {
+            transform: `translateY(${MOTION.HERO_ASSEMBLY_TRAVEL}px) rotate(-${MOTION.HERO_ASSEMBLY_ROTATION}deg)`,
+            opacity: 0.8,
+          },
+          {
+            transform: "translateY(0px) rotate(0deg)",
+            opacity: 1,
+          },
+        ],
+        {
+          duration: MOTION.HERO_ASSEMBLY_DURATION,
+          easing: MOTION.EASE_CONSIDERED,
+          fill: "forwards",
+        }
+      );
+
+      animationRef.current = anim;
+
+      return () => {
+        anim.cancel();
+        animationRef.current = null;
+      };
+    } catch {
+      // Fallback for environments without WAAPI
+      sheetEl.style.transform = "none";
+      sheetEl.style.opacity = "1";
+    }
+  }, [reducedMotion]);
+
+  // Art tilt: Fine pointer only, max 2deg, no React state re-renders per frame
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (reducedMotion || !isFinePointer() || !containerRef.current) return;
+
+    const rect = containerRef.current.getBoundingClientRect();
+    const { rotateX, rotateY } = computeTilt(e.clientX, e.clientY, rect, MOTION.TILT_MAX_DEG);
+
+    containerRef.current.style.transform = `perspective(1000px) rotateX(${rotateX.toFixed(
+      2
+    )}deg) rotateY(${rotateY.toFixed(2)}deg)`;
+  };
+
+  const handleMouseLeave = () => {
+    if (!containerRef.current) return;
+    containerRef.current.style.transform = "perspective(1000px) rotateX(0deg) rotateY(0deg)";
+  };
+
   return (
     <div
-      className={`relative w-full overflow-hidden rounded-panel border border-rule-strong bg-dark-canvas text-on-dark shadow-md ${className}`.trim()}
-      style={{ aspectRatio: "5 / 6" }}
+      ref={containerRef}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+      className={`relative w-full overflow-hidden rounded-panel border border-rule-strong bg-dark-canvas text-on-dark shadow-md transform-gpu transition-transform duration-200 ${className}`.trim()}
+      style={{
+        aspectRatio: "5 / 6",
+        transformStyle: "preserve-3d",
+      }}
+      aria-label="ClearGig illustrative project composition"
     >
       {/* Responsive photograph background with reserved layout box */}
       <picture className="absolute inset-0 block w-full h-full select-none pointer-events-none">
@@ -48,8 +139,12 @@ export function EstimateArtwork({ className = "" }: { className?: string }) {
         </span>
       </div>
 
-      {/* Floating HTML estimate sheet at lower-left, within artwork bounds */}
-      <div className="absolute bottom-3 left-3 right-3 sm:right-auto sm:bottom-5 sm:left-5 z-10 sm:max-w-xs w-auto">
+      {/* Floating HTML estimate sheet at lower-left (Hero Paper Assembly owner) */}
+      <div
+        ref={sheetRef}
+        className="absolute bottom-3 left-3 right-3 sm:right-auto sm:bottom-5 sm:left-5 z-10 sm:max-w-xs w-auto transform-gpu"
+        style={{ willChange: "transform, opacity" }}
+      >
         <div className="bg-paper text-ink p-4 sm:p-5 rounded-panel border border-rule shadow-lg">
           <div className="flex items-center justify-between pb-3 border-b border-rule">
             <span className="text-xs font-mono font-medium tracking-wider text-ink-muted uppercase">

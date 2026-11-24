@@ -37,10 +37,10 @@ export function Closing() {
             <div className="flex flex-wrap items-center gap-4 pt-1">
               <Link
                 href="/"
-                className="inline-flex items-center justify-center gap-2 font-sans rounded-control select-none transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-forest px-5 py-2.5 text-sm uppercase tracking-wider font-medium h-11 bg-ink text-paper hover:bg-forest"
+                className="group inline-flex items-center justify-center gap-2 font-sans rounded-control select-none transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-forest px-5 py-2.5 text-sm uppercase tracking-wider font-medium h-11 bg-ink text-paper hover:bg-forest"
               >
                 <span>Build an estimate</span>
-                <span aria-hidden="true" className="text-base">→</span>
+                <span aria-hidden="true" className="text-base transition-transform duration-150 group-hover:translate-x-0.5 motion-reduce:transform-none">→</span>
               </Link>
               <Link
                 href="/dashboard"

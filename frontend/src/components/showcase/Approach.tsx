@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   EstimateExample,
   type ScenarioId,
   type ApproachStepId,
 } from "./EstimateExample";
+import { useReducedMotion } from "./motion";
 
 export function Approach() {
   const [scenario, setScenario] = useState<ScenarioId>("website");
@@ -14,7 +15,12 @@ export function Approach() {
     "Website refresh scenario selected. Step 1: Define the work."
   );
 
+  const sectionRef = useRef<HTMLElement>(null);
+  const userInteractedRef = useRef<boolean>(false);
+  const reducedMotion = useReducedMotion();
+
   const handleScenarioChange = (newScenario: ScenarioId) => {
+    userInteractedRef.current = true;
     setScenario(newScenario);
     setAnnouncement(
       `${newScenario === "website" ? "Website refresh" : "Product build"} scenario selected.`
@@ -22,12 +28,40 @@ export function Approach() {
   };
 
   const handleStepChange = (newStep: ApproachStepId, stepTitle: string) => {
+    userInteractedRef.current = true;
     setActiveStep(newStep);
     setAnnouncement(`Step ${newStep}: ${stepTitle} focused.`);
   };
 
+  // Passive scroll observation: observer updates discrete step emphasis only if user hasn't interacted
+  // User buttons and focus retain permanent precedence over passive scroll
+  useEffect(() => {
+    if (reducedMotion || typeof IntersectionObserver === "undefined") return;
+
+    const el = sectionRef.current;
+    if (!el) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (userInteractedRef.current) return;
+        for (const entry of entries) {
+          if (entry.isIntersecting && entry.intersectionRatio >= 0.5) {
+            setActiveStep("02");
+          } else if (entry.isIntersecting && entry.intersectionRatio >= 0.2) {
+            setActiveStep("01");
+          }
+        }
+      },
+      { threshold: [0.2, 0.5] }
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [reducedMotion]);
+
   return (
     <section
+      ref={sectionRef}
       id="approach"
       className="w-full bg-dark-canvas text-on-dark py-16 sm:py-24 border-t border-rule-strong"
       aria-labelledby="approach-heading"
@@ -69,6 +103,9 @@ export function Approach() {
                 <button
                   type="button"
                   onClick={() => handleScenarioChange("website")}
+                  onFocus={() => {
+                    userInteractedRef.current = true;
+                  }}
                   aria-pressed={scenario === "website"}
                   className={`px-3.5 py-2 rounded-control text-xs font-mono uppercase tracking-wider transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-focus-dark cursor-pointer ${
                     scenario === "website"
@@ -81,6 +118,9 @@ export function Approach() {
                 <button
                   type="button"
                   onClick={() => handleScenarioChange("product")}
+                  onFocus={() => {
+                    userInteractedRef.current = true;
+                  }}
                   aria-pressed={scenario === "product"}
                   className={`px-3.5 py-2 rounded-control text-xs font-mono uppercase tracking-wider transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-focus-dark cursor-pointer ${
                     scenario === "product"
@@ -98,6 +138,9 @@ export function Approach() {
               <button
                 type="button"
                 onClick={() => handleStepChange("01", "Define the work")}
+                onFocus={() => {
+                  userInteractedRef.current = true;
+                }}
                 aria-pressed={activeStep === "01"}
                 className={`w-full text-left p-4 rounded-control border transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-focus-dark cursor-pointer ${
                   activeStep === "01"
@@ -121,6 +164,9 @@ export function Approach() {
               <button
                 type="button"
                 onClick={() => handleStepChange("02", "Review the numbers")}
+                onFocus={() => {
+                  userInteractedRef.current = true;
+                }}
                 aria-pressed={activeStep === "02"}
                 className={`w-full text-left p-4 rounded-control border transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-focus-dark cursor-pointer ${
                   activeStep === "02"
@@ -144,6 +190,9 @@ export function Approach() {
               <button
                 type="button"
                 onClick={() => handleStepChange("03", "Prepare the document")}
+                onFocus={() => {
+                  userInteractedRef.current = true;
+                }}
                 aria-pressed={activeStep === "03"}
                 className={`w-full text-left p-4 rounded-control border transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-focus-dark cursor-pointer ${
                   activeStep === "03"

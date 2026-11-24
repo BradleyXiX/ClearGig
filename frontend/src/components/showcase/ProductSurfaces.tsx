@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { DocumentStory } from "./DocumentStory";
+import { useReducedMotion } from "./motion";
 
 type FeatureKey = "scope" | "recurring" | "adjustments" | "document" | null;
 
@@ -102,6 +103,37 @@ const FEATURES: Array<{
 
 export function ProductSurfaces() {
   const [activeFeature, setActiveFeature] = useState<FeatureKey>(null);
+  const [isRevealed, setIsRevealed] = useState<boolean>(false);
+  const previewRef = useRef<HTMLDivElement>(null);
+  const reducedMotion = useReducedMotion();
+
+  // Decorative preview reveal: runs once when entering viewport, <=16px / 350-450ms
+  // Asynchronously updates state only upon intersection observation, never synchronously in effect body
+  useEffect(() => {
+    if (reducedMotion || typeof IntersectionObserver === "undefined") {
+      return;
+    }
+
+    const el = previewRef.current;
+    if (!el) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            setIsRevealed(true);
+            observer.disconnect();
+          }
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [reducedMotion]);
+
+  const showSettled = isRevealed || reducedMotion;
 
   return (
     <section
@@ -129,8 +161,13 @@ export function ProductSurfaces() {
           </p>
         </div>
 
-        {/* Asymmetric 8/12 and 4/12 Composition */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 mt-12 sm:mt-16 items-start">
+        {/* Asymmetric 8/12 and 4/12 Composition (Decorative preview reveal owner) */}
+        <div
+          ref={previewRef}
+          className={`grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 mt-12 sm:mt-16 items-start transform-gpu transition-opacity duration-300 transition-transform duration-300 ${
+            showSettled ? "opacity-100 translate-y-0" : "opacity-90 translate-y-4"
+          }`}
+        >
           {/* 8/12 Columns: DOM Dashboard Preview */}
           <div
             className="lg:col-span-8 bg-paper-sunken border border-rule rounded-panel p-4 sm:p-6 shadow-sm space-y-4"

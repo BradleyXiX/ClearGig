@@ -44,6 +44,9 @@ function loadComponent<T = Record<string, React.ComponentType<Record<string, unk
     if (id === "./DocumentStory" || id.includes("DocumentStory")) {
       return loadComponent("src/components/showcase/DocumentStory.tsx");
     }
+    if (id === "./motion" || id.includes("motion")) {
+      return loadComponent("src/components/showcase/motion.ts");
+    }
     if (id === "@/components/showcase/Closing" || id.includes("Closing")) {
       return loadComponent("src/components/showcase/Closing.tsx");
     }
@@ -454,4 +457,112 @@ test("Showcase Closing, Questions & Footer: enforce strict price-free policy", (
     // Strictly assert no standalone percentage rates
     assert.doesNotMatch(html, /\b\d+%/);
   }
+});
+
+test("Showcase Motion: motion matrix constants strictly respect design.md boundaries", () => {
+  const { MOTION } = loadComponent<{
+    MOTION: typeof import("../components/showcase/motion").MOTION;
+  }>("src/components/showcase/motion.ts");
+
+  // Hero paper assembly finite 650–800ms
+  assert.ok(
+    MOTION.HERO_ASSEMBLY_DURATION >= 650 && MOTION.HERO_ASSEMBLY_DURATION <= 800,
+    `HERO_ASSEMBLY_DURATION ${MOTION.HERO_ASSEMBLY_DURATION} must be between 650 and 800ms`
+  );
+  assert.ok(
+    MOTION.HERO_ASSEMBLY_TRAVEL <= 16,
+    `HERO_ASSEMBLY_TRAVEL ${MOTION.HERO_ASSEMBLY_TRAVEL} must be <= 16px`
+  );
+  assert.ok(
+    MOTION.HERO_ASSEMBLY_ROTATION <= 2,
+    `HERO_ASSEMBLY_ROTATION ${MOTION.HERO_ASSEMBLY_ROTATION} must be <= 2deg`
+  );
+
+  // Art tilt max 2deg fine pointer only, ~180–250ms settling
+  assert.ok(
+    MOTION.TILT_MAX_DEG <= 2,
+    `TILT_MAX_DEG ${MOTION.TILT_MAX_DEG} must be <= 2deg`
+  );
+  assert.ok(
+    MOTION.TILT_SETTLE_MS >= 180 && MOTION.TILT_SETTLE_MS <= 250,
+    `TILT_SETTLE_MS ${MOTION.TILT_SETTLE_MS} must be between 180 and 250ms`
+  );
+
+  // Section reveal <=16px / 350–450ms
+  assert.ok(
+    MOTION.SECTION_REVEAL_DURATION >= 350 && MOTION.SECTION_REVEAL_DURATION <= 450,
+    `SECTION_REVEAL_DURATION ${MOTION.SECTION_REVEAL_DURATION} must be between 350 and 450ms`
+  );
+  assert.ok(
+    MOTION.SECTION_REVEAL_TRAVEL <= 16,
+    `SECTION_REVEAL_TRAVEL ${MOTION.SECTION_REVEAL_TRAVEL} must be <= 16px`
+  );
+
+  // Buttons arrow travel <=3px, 120–160ms
+  assert.ok(
+    MOTION.BUTTON_ARROW_TRAVEL <= 3,
+    `BUTTON_ARROW_TRAVEL ${MOTION.BUTTON_ARROW_TRAVEL} must be <= 3px`
+  );
+  assert.ok(
+    MOTION.BUTTON_ARROW_DURATION >= 120 && MOTION.BUTTON_ARROW_DURATION <= 160,
+    `BUTTON_ARROW_DURATION ${MOTION.BUTTON_ARROW_DURATION} must be between 120 and 160ms`
+  );
+});
+
+test("Showcase Motion: computeTilt calculates bounded rotations and handles bounds", () => {
+  const { computeTilt } = loadComponent<{
+    computeTilt: typeof import("../components/showcase/motion").computeTilt;
+  }>("src/components/showcase/motion.ts");
+  const rect = { left: 100, top: 100, width: 400, height: 400 };
+
+  // Center coordinate produces zero tilt
+  const center = computeTilt(300, 300, rect);
+  assert.equal(center.rotateX, 0);
+  assert.equal(center.rotateY, 0);
+
+  // Corner coordinates are strictly bounded to max 2deg
+  const topLeft = computeTilt(100, 100, rect);
+  assert.ok(Math.abs(topLeft.rotateX) <= 2);
+  assert.ok(Math.abs(topLeft.rotateY) <= 2);
+
+  // Extreme coordinates beyond rect clamp to 2deg max
+  const extreme = computeTilt(1000, -500, rect);
+  assert.equal(Math.abs(extreme.rotateX), 2);
+  assert.equal(Math.abs(extreme.rotateY), 2);
+});
+
+test("Showcase Motion: EstimateArtwork renders settled static layout for SSR and reduced motion", () => {
+  const { EstimateArtwork } = loadComponent("src/components/showcase/EstimateArtwork.tsx");
+  const html = ReactDOMServer.renderToStaticMarkup(React.createElement(EstimateArtwork));
+
+  // Renders complete illustrative estimate content without requiring client WAAPI
+  assert.match(html, /ILLUSTRATIVE ESTIMATE/);
+  assert.match(html, /Northline Studio/);
+  assert.match(html, /Website refresh/);
+  assert.match(html, /Ready to review/);
+
+  // Reserved layout box prevents layout shift
+  assert.match(html, /aspect-ratio:5 \/ 6|aspectRatio/);
+  assert.match(html, /WORKFLOW PREVIEW · NO PRICING SHOWN/);
+});
+
+test("Showcase Motion: Approach and ProductSurfaces preserve immediate readability without motion blocking", () => {
+  const { Approach } = loadComponent("src/components/showcase/Approach.tsx");
+  const { ProductSurfaces } = loadComponent("src/components/showcase/ProductSurfaces.tsx");
+
+  const approachHtml = ReactDOMServer.renderToStaticMarkup(React.createElement(Approach));
+  const productHtml = ReactDOMServer.renderToStaticMarkup(React.createElement(ProductSurfaces));
+
+  // Approach narrative and buttons are immediately readable
+  assert.match(approachHtml, /THE APPROACH/);
+  assert.match(approachHtml, /01 Define the work/);
+  assert.match(approachHtml, /02 Review the numbers/);
+  assert.match(approachHtml, /03 Prepare the document/);
+
+  // Product surfaces headings and fixture projects are immediately present in markup
+  assert.match(productHtml, /BUILT AROUND THE WORK/);
+  assert.match(productHtml, /The details,/);
+  assert.match(productHtml, /Sample workspace/);
+  assert.match(productHtml, /Website refresh/);
+  assert.match(productHtml, /Cloud infrastructure audit/);
 });
