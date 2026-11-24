@@ -47,7 +47,7 @@ export const SCENARIOS: Record<ScenarioId, ScenarioData> = {
     ],
     structure: {
       baseAllocation: "Core implementation milestones",
-      contingencyMargin: "15% buffer included",
+      contingencyMargin: "Contingency considered",
       cadence: "One-time milestone + monthly support",
     },
     documentDetails: {
@@ -72,7 +72,7 @@ export const SCENARIOS: Record<ScenarioId, ScenarioData> = {
     ],
     structure: {
       baseAllocation: "Engineering sprints & architecture",
-      contingencyMargin: "15% risk mitigation margin",
+      contingencyMargin: "Risk allowance considered",
       cadence: "Sprint cycles + recurring infrastructure",
     },
     documentDetails: {

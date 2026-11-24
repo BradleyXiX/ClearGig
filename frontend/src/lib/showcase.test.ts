@@ -200,32 +200,40 @@ test("Approach Section: renders Section 5D narrative, three step buttons, and li
 test("EstimateExample & Scenarios: enforces price-free policy and accurate data switching across scenarios", () => {
   const { EstimateExample } = loadComponent("src/components/showcase/EstimateExample.tsx");
 
-  // Render website scenario
-  const websiteHtml = ReactDOMServer.renderToStaticMarkup(
-    React.createElement(EstimateExample, { scenario: "website", activeStep: "01" })
-  );
-  assert.match(websiteHtml, /Northline Studio/);
-  assert.match(websiteHtml, /Frontend \+ backend/);
-  assert.match(websiteHtml, /Website \+ content structure/);
-  assert.match(websiteHtml, /Maintenance planning/);
-  assert.match(websiteHtml, /Ready to review/);
+  const scenarios = ["website", "product"] as const;
+  const steps = ["01", "02", "03"] as const;
 
-  // Render product scenario
-  const productHtml = ReactDOMServer.renderToStaticMarkup(
-    React.createElement(EstimateExample, { scenario: "product", activeStep: "02" })
-  );
-  assert.match(productHtml, /Acme Platform Co\./);
-  assert.match(productHtml, /Interface \+ platform/);
-  assert.match(productHtml, /Product \+ supporting services/);
-  assert.match(productHtml, /Infrastructure planning/);
-  assert.match(productHtml, /Ready to review/);
+  for (const scenario of scenarios) {
+    for (const activeStep of steps) {
+      const html = ReactDOMServer.renderToStaticMarkup(
+        React.createElement(EstimateExample, { scenario, activeStep })
+      );
 
-  // Strictly assert no prices, dollar symbols, or rates across both scenarios
-  for (const html of [websiteHtml, productHtml]) {
-    assert.doesNotMatch(html, /[$€£]/);
-    assert.doesNotMatch(html, /\/hr/i);
-    assert.doesNotMatch(html, /\/hour/i);
-    assert.doesNotMatch(html, /\b\d+(\.\d{2})?\s*(USD|EUR|GBP)\b/i);
-    assert.match(html, /Workflow preview · No pricing shown/);
+      // Verify scenario identity
+      if (scenario === "website") {
+        assert.match(html, /Northline Studio/);
+        assert.match(html, /Frontend \+ backend/);
+        assert.match(html, /Website \+ content structure/);
+        assert.match(html, /Maintenance planning/);
+      } else {
+        assert.match(html, /Acme Platform Co\./);
+        assert.match(html, /Interface \+ platform/);
+        assert.match(html, /Product \+ supporting services/);
+        assert.match(html, /Infrastructure planning/);
+      }
+      assert.match(html, /Ready to review/);
+
+      // Verify active step focused view is present in rendered output
+      assert.match(html, /Focused view/);
+
+      // Strictly assert no prices, currency symbols, hourly indicators, or financial percentages
+      assert.doesNotMatch(html, /[$€£]/);
+      assert.doesNotMatch(html, /\/hr/i);
+      assert.doesNotMatch(html, /\/hour/i);
+      assert.doesNotMatch(html, /\b\d+(\.\d{2})?\s*(USD|EUR|GBP)\b/i);
+      // Ensure no financial adjustment percentages (e.g. 15% or any \d+%)
+      assert.doesNotMatch(html, /\d+%/);
+      assert.match(html, /Workflow preview · No pricing shown/);
+    }
   }
 });
