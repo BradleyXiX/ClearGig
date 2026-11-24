@@ -156,3 +156,113 @@ test('api handles non-JSON error responses (e.g. proxy HTML error) gracefully', 
     }
   );
 });
+
+test('JSON-reading endpoint rejects an empty 200 success instead of resolving undefined', async (t) => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  globalThis.fetch = async () => {
+    return new Response('', {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  };
+
+  await assert.rejects(
+    async () => {
+      await api.getProjects();
+    },
+    (err: unknown) => {
+      assert(err instanceof Error);
+      return true;
+    }
+  );
+});
+
+test('JSON-returning create/update endpoint rejects missing expected JSON', async (t) => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  globalThis.fetch = async () => {
+    return new Response('', {
+      status: 201,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  };
+
+  await assert.rejects(
+    async () => {
+      await api.createProject({ client_id: 'c1', title: 'New Proj' });
+    },
+    (err: unknown) => {
+      assert(err instanceof Error);
+      return true;
+    }
+  );
+});
+
+test('unexpected 204 for a JSON endpoint rejects instead of resolving undefined', async (t) => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  globalThis.fetch = async () => {
+    return new Response(null, { status: 204 });
+  };
+
+  await assert.rejects(
+    async () => {
+      await api.getProjectById('proj-123');
+    },
+    (err: unknown) => {
+      assert(err instanceof Error);
+      return true;
+    }
+  );
+});
+
+test('malformed nonempty JSON success still rejects', async (t) => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  globalThis.fetch = async () => {
+    return new Response('{not: valid: json}', {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  };
+
+  await assert.rejects(
+    async () => {
+      await api.getClients();
+    },
+    (err: unknown) => {
+      assert(err instanceof Error);
+      return true;
+    }
+  );
+});
+
+test('genuine empty array [] is parsed as a valid empty list', async (t) => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  globalThis.fetch = async () => {
+    return new Response('[]', {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  };
+
+  const projects = await api.getProjects();
+  assert.deepEqual(projects, []);
+});

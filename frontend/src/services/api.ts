@@ -80,7 +80,7 @@ export class ApiError extends Error {
   }
 }
 
-async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> {
+async function request(endpoint: string, options?: RequestInit): Promise<Response> {
   const baseUrl = getApiBaseUrl();
   const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
   const res = await fetch(`${baseUrl}${path}`, {
@@ -107,69 +107,74 @@ async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> 
     }
     throw new ApiError(res.status, message, code);
   }
+  return res;
+}
 
-  // Handle 204 No Content or responses with empty bodies safely
+async function fetchJson<T>(endpoint: string, options?: RequestInit): Promise<T> {
+  const res = await request(endpoint, options);
   if (res.status === 204) {
-    return undefined as unknown as T;
+    throw new ApiError(res.status, `Unexpected 204 No Content for endpoint expecting JSON: ${endpoint}`);
   }
-
   const text = await res.text();
   if (!text) {
-    return undefined as unknown as T;
+    throw new ApiError(res.status, `Empty response body for endpoint expecting JSON: ${endpoint}`);
   }
-
   return JSON.parse(text) as T;
+}
+
+async function fetchVoid(endpoint: string, options?: RequestInit): Promise<void> {
+  await request(endpoint, options);
 }
 
 export const api = {
   async getClients(): Promise<Client[]> {
-    return fetchAPI<Client[]>('/clients');
+    return fetchJson<Client[]>('/clients');
   },
 
   async createClient(data: CreateClientDTO): Promise<Client> {
-    return fetchAPI<Client>('/clients', {
+    return fetchJson<Client>('/clients', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   },
 
   async updateProject(id: string, data: UpdateProjectDTO): Promise<Project> {
-    return fetchAPI<Project>(`/projects/${id}`, {
+    return fetchJson<Project>(`/projects/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     });
   },
 
   async getProjects(): Promise<Project[]> {
-    return fetchAPI<Project[]>('/projects');
+    return fetchJson<Project[]>('/projects');
   },
 
   async getProjectById(id: string): Promise<Project> {
-    return fetchAPI<Project>(`/projects/${id}`);
+    return fetchJson<Project>(`/projects/${id}`);
   },
 
   async createProject(data: CreateProjectDTO): Promise<Project> {
-    return fetchAPI<Project>('/projects', {
+    return fetchJson<Project>('/projects', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   },
 
   async addLineItem(projectId: string, data: CreateLineItemDTO): Promise<LineItem> {
-    return fetchAPI<LineItem>(`/projects/${projectId}/line-items`, {
+    return fetchJson<LineItem>(`/projects/${projectId}/line-items`, {
       method: 'POST',
       body: JSON.stringify(data),
     });
   },
 
   async deleteLineItem(id: string): Promise<{ message: string }> {
-    return fetchAPI<{ message: string }>(`/line-items/${id}`, {
+    return fetchJson<{ message: string }>(`/line-items/${id}`, {
       method: 'DELETE',
     });
   },
 
   async deleteProject(id: string): Promise<void> {
-    return fetchAPI<void>(`/projects/${id}`, {
+    return fetchVoid(`/projects/${id}`, {
       method: 'DELETE',
     });
   }
