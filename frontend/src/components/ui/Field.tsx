@@ -60,15 +60,14 @@ export const Field = React.forwardRef<HTMLInputElement, FieldProps>(function Fie
   const announcedSuffix = getUnitAnnouncement(suffixUnit, suffix);
   const unitAnnouncement = [announcedPrefix, announcedSuffix].filter(Boolean).join(", ");
 
-  // Collect active description IDs
+  // Collect active description IDs - only include IDs for elements that are actually rendered
   const descIds: string[] = [];
   if (callerDescribedBy) {
     descIds.push(...callerDescribedBy.split(/\s+/).filter(Boolean));
   }
   if (error) {
     descIds.push(errorId);
-  }
-  if (hint) {
+  } else if (hint) {
     descIds.push(hintId);
   }
   if (unitAnnouncement) {

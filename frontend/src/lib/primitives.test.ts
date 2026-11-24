@@ -89,6 +89,41 @@ test("Field: forces aria-invalid=true on error even when caller requested aria-i
   assert.match(html, /<span id="rate-field-err-error" role="alert" class="text-sm text-danger font-medium">Rate is required<\/span>/);
 });
 
+test("Field: when both error and hint are present with caller description and units, all referenced IDs point to actual rendered elements", () => {
+  const { Field } = loadComponent("src/components/ui/Field.tsx");
+  const html = ReactDOMServer.renderToStaticMarkup(
+    React.createElement(Field, {
+      id: "combined-field",
+      label: "Hourly rate",
+      hint: "Rate in USD per hour",
+      error: "Rate is required",
+      prefix: "$",
+      suffix: "/hr",
+      "aria-describedby": "caller-description",
+      "aria-invalid": false,
+    })
+  );
+
+  // aria-invalid should be forced to true
+  assert.match(html, /aria-invalid="true"/);
+
+  // Extract aria-describedby attribute from input
+  const match = html.match(/<input[^>]*aria-describedby="([^"]+)"/);
+  assert.ok(match, "input must have aria-describedby");
+  const tokenList = match[1].split(/\s+/).filter(Boolean);
+
+  // Caller description must be preserved
+  assert.ok(tokenList.includes("caller-description"), "must include caller-description");
+
+  // Every generated ID referenced in aria-describedby must correspond to an actual rendered element with that id in the output
+  const generatedTokens = tokenList.filter((id) => id !== "caller-description");
+  assert.ok(generatedTokens.length > 0, "must reference generated IDs (error, unit, etc.)");
+  for (const id of generatedTokens) {
+    const idRegex = new RegExp(`id="${id}"`);
+    assert.match(html, idRegex, `Referenced ID "${id}" in aria-describedby must exist as a rendered element id in HTML`);
+  }
+});
+
 test("Field: renders 16px text role for input and 14px text role for label", () => {
   const { Field } = loadComponent("src/components/ui/Field.tsx");
   const html = ReactDOMServer.renderToStaticMarkup(
