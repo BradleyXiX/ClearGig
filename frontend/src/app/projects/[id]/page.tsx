@@ -1,11 +1,15 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useEffect, useSyncExternalStore, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { api, type Project } from '@/services/api';
+import { api } from '@/services/api';
 import { computeTotals } from '@/lib/totals';
 import { folio } from '@/lib/folio';
+import {
+  createProjectController,
+  type ProjectControllerState,
+} from '@/lib/project-controller';
 import { Stamp } from '@/components/ui/Stamp';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
@@ -16,99 +20,30 @@ import { FinOpsAudit } from '@/components/FinOpsAudit';
 export default function ProjectDetail() {
   const { id } = useParams() as { id: string };
   const router = useRouter();
+  const deleteTriggerRef = useRef<HTMLButtonElement | null>(null);
 
-  const [project, setProject] = useState<Project | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [statusMenuOpen, setStatusMenuOpen] = useState(false);
-  const [confirmDeleteProject, setConfirmDeleteProject] = useState(false);
-  const [activeTab, setActiveTab] = useState<'estimate' | 'audit'>('estimate');
+  // Initialize project controller once per component lifetime
+  const [controller] = React.useState(() =>
+    createProjectController({
+      projectId: id,
+      api,
+    })
+  );
 
-  // Local state for editable settings
-  const [contingencyPercentage, setContingencyPercentage] = useState(0);
-  const [profitMargin, setProfitMargin] = useState(0);
-  const [status, setStatus] = useState<Project['status']>('DRAFT');
-
-  // Add line item form state
-  const [category, setCategory] = useState<'FRONTEND' | 'BACKEND' | 'CLOUD' | 'MAINTENANCE'>('FRONTEND');
-  const [description, setDescription] = useState('');
-  const [estimatedHours, setEstimatedHours] = useState('');
-  const [hourlyRate, setHourlyRate] = useState('');
-  const [isRecurring, setIsRecurring] = useState(false);
-
-  const loadProject = async () => {
-    try {
-      const data = await api.getProjectById(id);
-      setProject(data);
-      setContingencyPercentage(Number(data.contingencyPercentage) || 0);
-      setProfitMargin(Number(data.profitMargin) || 0);
-      setStatus(data.status);
-    } catch (error) {
-      console.error('Error loading project:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const state: ProjectControllerState = useSyncExternalStore(
+    controller.subscribe,
+    controller.getState,
+    controller.getState
+  );
 
   useEffect(() => {
-    loadProject();
-  }, [id]);
+    controller.loadProject();
+  }, [controller]);
 
-  const handleAddLineItem = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!description || !estimatedHours || !hourlyRate) return;
-
-    try {
-      await api.addLineItem(id, {
-        category,
-        description,
-        estimated_hours: Number(estimatedHours),
-        hourly_rate: Number(hourlyRate),
-        is_recurring: isRecurring,
-      });
-
-      setDescription('');
-      setEstimatedHours('');
-      setHourlyRate('');
-      setIsRecurring(false);
-      loadProject();
-    } catch (error) {
-      console.error('Error adding line item:', error);
-    }
-  };
-
-  const handleSaveProject = async () => {
-    setIsSaving(true);
-    try {
-      await api.updateProject(id, {
-        contingency_percentage: contingencyPercentage,
-        profit_margin: profitMargin,
-        status: status,
-      });
-      await loadProject();
-    } catch (error) {
-      console.error('Error saving project:', error);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleDeleteLineItem = async (itemId: string) => {
-    try {
-      await api.deleteLineItem(itemId);
-      loadProject();
-    } catch (error) {
-      console.error('Error deleting line item:', error);
-    }
-  };
-
-  const handleDeleteProject = async () => {
-    try {
-      await api.deleteProject(id);
-      router.push('/dashboard');
-    } catch (error) {
-      console.error('Error deleting project:', error);
-    }
+  const handleCancelDeleteProject = () => {
+    controller.setConfirmDeleteProject(false);
+    // Return focus logically to the delete trigger button
+    deleteTriggerRef.current?.focus();
   };
 
   const handleExportEstimate = () => {
@@ -119,7 +54,7 @@ export default function ProjectDetail() {
     window.open(`/projects/${id}/document?variant=audit`, '_blank');
   };
 
-  if (isLoading) {
+  if (state.isLoading) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12">
         <div className="space-y-4">
@@ -130,27 +65,55 @@ export default function ProjectDetail() {
     );
   }
 
-  if (!project) {
+  if (state.loadErrorType === 'not_found' || (!state.project && !state.isLoading && state.loadErrorType !== 'unavailable')) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12 text-center">
-        <h2 className="text-2xl font-semibold mb-4 text-ink">Estimate not found</h2>
-        <Link href="/dashboard" className="text-sm font-medium text-accent hover:underline">
-          Return to dashboard
-        </Link>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12 text-center space-y-4">
+        <h2 className="text-2xl font-semibold text-ink">Estimate not found</h2>
+        <p className="text-sm text-ink-muted">
+          {state.loadError ?? `Estimate "${id}" does not exist in the ledger.`}
+        </p>
+        <div>
+          <Link
+            href="/dashboard"
+            className="inline-flex items-center justify-center font-sans rounded-control font-medium h-9 px-4 py-2 text-xs uppercase tracking-wider bg-ink text-paper hover:bg-forest transition-colors duration-150"
+          >
+            Return to dashboard
+          </Link>
+        </div>
       </div>
     );
   }
 
-  const isLocked = status !== 'DRAFT';
-  const isDirty =
-    contingencyPercentage !== (Number(project.contingencyPercentage) || 0) ||
-    profitMargin !== (Number(project.profitMargin) || 0) ||
-    status !== project.status;
+  if (state.loadErrorType === 'unavailable') {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12 text-center space-y-4">
+        <h2 className="text-2xl font-semibold text-ink">Service unavailable</h2>
+        <p className="text-sm text-ink-muted max-w-md mx-auto">
+          {state.loadError ?? 'Unable to connect to the ClearGig database service. Your data is safe.'}
+        </p>
+        <div className="flex items-center justify-center gap-3 pt-2">
+          <Button variant="primary" onClick={() => controller.loadProject()}>
+            Retry connection
+          </Button>
+          <Link
+            href="/dashboard"
+            className="inline-flex items-center justify-center font-sans rounded-control font-medium h-11 px-4 py-2 text-sm text-ink-muted hover:text-ink hover:bg-paper-sunken transition-colors duration-150"
+          >
+            Dashboard
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const project = state.project!;
+  const isLocked = state.status !== 'DRAFT';
+  const isDirty = controller.isDirty();
 
   const currentTotals = computeTotals({
-    lineItems: project.lineItems,
-    contingencyPercentage,
-    profitMargin,
+    lineItems: project.lineItems || [],
+    contingencyPercentage: state.contingencyPercentage,
+    profitMargin: state.profitMargin,
   });
 
   const folioNumber = folio(project);
@@ -183,27 +146,39 @@ export default function ProjectDetail() {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Status Stamp with dropdown menu */}
+            {/* Status Stamp with accessible dropdown menu */}
             <div className="relative">
               <button
                 type="button"
-                onClick={() => setStatusMenuOpen(!statusMenuOpen)}
-                className="p-1 rounded-control hover:bg-paper-sunken transition-colors duration-150"
+                onClick={() => controller.setStatusMenuOpen(!state.statusMenuOpen)}
+                aria-expanded={state.statusMenuOpen}
+                aria-haspopup="listbox"
+                className="p-1 rounded-control hover:bg-paper-sunken transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-forest"
                 title="Change status"
               >
-                <Stamp status={status} />
+                <Stamp status={state.status} />
               </button>
-              {statusMenuOpen && (
-                <div className="absolute right-0 mt-1 z-30 bg-paper-raised border border-rule rounded-card p-1 flex flex-col gap-1 min-w-32">
+              {state.statusMenuOpen && (
+                <div
+                  role="listbox"
+                  aria-label="Estimate status options"
+                  className="absolute right-0 mt-1 z-30 bg-paper-raised border border-rule rounded-card p-1 flex flex-col gap-1 min-w-36 shadow-lg"
+                >
                   {(['DRAFT', 'SENT', 'ACCEPTED', 'REJECTED'] as const).map((s) => (
                     <button
                       key={s}
                       type="button"
+                      role="option"
+                      aria-selected={state.status === s}
                       onClick={() => {
-                        setStatus(s);
-                        setStatusMenuOpen(false);
+                        controller.setStatus(s);
+                        controller.setStatusMenuOpen(false);
                       }}
-                      className="px-3 py-1.5 text-left text-xs uppercase tracking-wider text-ink hover:bg-paper-sunken rounded-control transition-colors duration-150"
+                      className={`px-3 py-1.5 text-left text-xs uppercase tracking-wider rounded-control transition-colors duration-150 ${
+                        state.status === s
+                          ? 'bg-ink text-paper font-semibold'
+                          : 'text-ink hover:bg-paper-sunken'
+                      }`}
                     >
                       {s}
                     </button>
@@ -215,21 +190,48 @@ export default function ProjectDetail() {
             <Button
               variant="primary"
               size="md"
-              onClick={handleSaveProject}
-              disabled={!isDirty || isSaving}
+              onClick={() => controller.handleSaveProject()}
+              disabled={!isDirty || state.isSaving}
             >
-              {isSaving ? 'Saving...' : 'Save'}
+              {state.isSaving ? 'Saving...' : 'Save'}
             </Button>
           </div>
         </div>
 
+        {/* Persistent Mutation Feedback Alerts */}
+        {state.saveError && (
+          <div
+            role="alert"
+            className="mt-4 border border-danger rounded-card p-3 bg-paper-sunken text-xs text-danger flex justify-between items-center"
+          >
+            <span>{state.saveError}</span>
+            <Button variant="quiet" size="sm" onClick={() => controller.clearMessages()}>
+              Dismiss
+            </Button>
+          </div>
+        )}
+
+        {state.saveSuccessMessage && (
+          <div
+            role="status"
+            className="mt-4 border border-accent rounded-card p-3 bg-paper-raised text-xs text-accent flex justify-between items-center"
+          >
+            <span>{state.saveSuccessMessage}</span>
+            <Button variant="quiet" size="sm" onClick={() => controller.clearMessages()}>
+              Dismiss
+            </Button>
+          </div>
+        )}
+
         {/* Two-item switch under title: Estimate | FinOps audit */}
-        <div className="flex items-center gap-6 border-b border-rule mt-6">
+        <div className="flex items-center gap-6 border-b border-rule mt-6" role="tablist">
           <button
             type="button"
-            onClick={() => setActiveTab('estimate')}
+            role="tab"
+            aria-selected={state.activeTab === 'estimate'}
+            onClick={() => controller.setActiveTab('estimate')}
             className={`py-2 border-b-2 text-sm transition-colors duration-150 ${
-              activeTab === 'estimate'
+              state.activeTab === 'estimate'
                 ? 'border-accent text-ink font-medium'
                 : 'border-transparent text-ink-muted hover:text-ink'
             }`}
@@ -238,9 +240,11 @@ export default function ProjectDetail() {
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab('audit')}
+            role="tab"
+            aria-selected={state.activeTab === 'audit'}
+            onClick={() => controller.setActiveTab('audit')}
             className={`py-2 border-b-2 text-sm transition-colors duration-150 ${
-              activeTab === 'audit'
+              state.activeTab === 'audit'
                 ? 'border-accent text-ink font-medium'
                 : 'border-transparent text-ink-muted hover:text-ink'
             }`}
@@ -254,30 +258,55 @@ export default function ProjectDetail() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Column */}
         <div className="lg:col-span-2 space-y-8">
-          {activeTab === 'estimate' ? (
+          {state.activeTab === 'estimate' ? (
             <>
               {/* Add Line Item Form (hidden when locked) */}
               {isLocked ? (
                 <div className="border border-rule rounded-card bg-paper-sunken p-6 text-center">
                   <p className="text-sm text-ink-muted">
-                    Estimate is locked ({status}). Switch status back to DRAFT to add or remove items.
+                    Estimate is currently in <span className="font-semibold">{state.status}</span> status. Switch status back to DRAFT to add or remove items.
                   </p>
                 </div>
               ) : (
-                <div className="border border-rule rounded-card bg-paper-raised p-6">
-                  <h2 className="text-xs font-medium uppercase tracking-wider text-ink-muted mb-4">
+                <div className="border border-rule rounded-card bg-paper-raised p-6 space-y-4">
+                  <h2 className="text-xs font-medium uppercase tracking-wider text-ink-muted">
                     Add line item
                   </h2>
-                  <form onSubmit={handleAddLineItem} className="space-y-4">
+
+                  {state.addLineItemError && (
+                    <div
+                      role="alert"
+                      className="border border-danger rounded-card p-3 bg-paper-sunken text-xs text-danger"
+                    >
+                      {state.addLineItemError}
+                    </div>
+                  )}
+
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      controller.handleAddLineItem();
+                    }}
+                    className="space-y-4"
+                  >
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
-                        <label className="text-xs font-medium uppercase tracking-wider text-ink-muted block mb-1">
+                        <label
+                          htmlFor="line-item-category"
+                          className="text-xs font-medium uppercase tracking-wider text-ink-muted block mb-1"
+                        >
                           Category
                         </label>
                         <select
-                          value={category}
-                          onChange={(e) => setCategory(e.target.value as typeof category)}
-                          className="w-full bg-paper-raised text-ink border border-rule rounded-control px-3 py-2 text-sm focus:outline-none focus:border-accent"
+                          id="line-item-category"
+                          value={state.lineItemForm.category}
+                          onChange={(e) =>
+                            controller.setLineItemForm({
+                              category: e.target.value as typeof state.lineItemForm.category,
+                            })
+                          }
+                          disabled={state.isAddingLineItem}
+                          className="w-full bg-paper-raised text-ink border border-rule rounded-control px-3 py-2 text-sm focus:outline-none focus:border-accent disabled:opacity-50"
                         >
                           <option value="FRONTEND">Frontend</option>
                           <option value="BACKEND">Backend</option>
@@ -290,8 +319,11 @@ export default function ProjectDetail() {
                           label="Description"
                           type="text"
                           placeholder="Scope module description"
-                          value={description}
-                          onChange={(e) => setDescription(e.target.value)}
+                          value={state.lineItemForm.description}
+                          onChange={(e) =>
+                            controller.setLineItemForm({ description: e.target.value })
+                          }
+                          disabled={state.isAddingLineItem}
                           required
                         />
                       </div>
@@ -302,8 +334,11 @@ export default function ProjectDetail() {
                           step="0.5"
                           min="0"
                           suffix="hrs"
-                          value={estimatedHours}
-                          onChange={(e) => setEstimatedHours(e.target.value)}
+                          value={state.lineItemForm.estimatedHours}
+                          onChange={(e) =>
+                            controller.setLineItemForm({ estimatedHours: e.target.value })
+                          }
+                          disabled={state.isAddingLineItem}
                           required
                         />
                       </div>
@@ -313,9 +348,13 @@ export default function ProjectDetail() {
                           type="number"
                           step="1"
                           min="0"
-                          suffix="$/hr"
-                          value={hourlyRate}
-                          onChange={(e) => setHourlyRate(e.target.value)}
+                          prefix="$"
+                          suffix="/hr"
+                          value={state.lineItemForm.hourlyRate}
+                          onChange={(e) =>
+                            controller.setLineItemForm({ hourlyRate: e.target.value })
+                          }
+                          disabled={state.isAddingLineItem}
                           required
                         />
                       </div>
@@ -325,16 +364,24 @@ export default function ProjectDetail() {
                       <label className="flex items-center gap-2 cursor-pointer">
                         <input
                           type="checkbox"
-                          checked={isRecurring}
-                          onChange={(e) => setIsRecurring(e.target.checked)}
+                          checked={state.lineItemForm.isRecurring}
+                          onChange={(e) =>
+                            controller.setLineItemForm({ isRecurring: e.target.checked })
+                          }
+                          disabled={state.isAddingLineItem}
                           className="accent-accent w-4 h-4 rounded-control"
                         />
                         <span className="text-xs uppercase tracking-wider text-ink">
                           Recurring monthly cost
                         </span>
                       </label>
-                      <Button variant="secondary" size="sm" type="submit">
-                        Add item
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        type="submit"
+                        disabled={state.isAddingLineItem}
+                      >
+                        {state.isAddingLineItem ? 'Adding item...' : 'Add item'}
                       </Button>
                     </div>
                   </form>
@@ -348,8 +395,10 @@ export default function ProjectDetail() {
                 </h2>
                 <LineItemTable
                   items={project.lineItems || []}
-                  onDelete={handleDeleteLineItem}
+                  onDelete={(itemId) => controller.handleDeleteLineItem(itemId)}
                   isLocked={isLocked}
+                  deletingId={state.deletingLineItemId}
+                  errorMessage={state.lineItemError}
                 />
               </div>
             </>
@@ -364,11 +413,11 @@ export default function ProjectDetail() {
 
         {/* Right Column: Summary rail + Global toggles + Delete */}
         <div className="space-y-6">
-          {activeTab === 'estimate' ? (
+          {state.activeTab === 'estimate' ? (
             <EstimateSummary
               totals={currentTotals}
-              contingencyPercentage={contingencyPercentage}
-              profitMargin={profitMargin}
+              contingencyPercentage={state.contingencyPercentage}
+              profitMargin={state.profitMargin}
               onExport={handleExportEstimate}
             />
           ) : (
@@ -395,9 +444,9 @@ export default function ProjectDetail() {
               min="0"
               max="100"
               suffix="%"
-              value={contingencyPercentage}
-              onChange={(e) => setContingencyPercentage(Number(e.target.value))}
-              disabled={isLocked}
+              value={state.contingencyPercentage}
+              onChange={(e) => controller.setContingencyPercentage(Number(e.target.value))}
+              disabled={isLocked || state.isSaving}
             />
 
             <Field
@@ -407,33 +456,54 @@ export default function ProjectDetail() {
               min="0"
               max="100"
               suffix="%"
-              value={profitMargin}
-              onChange={(e) => setProfitMargin(Number(e.target.value))}
-              disabled={isLocked}
+              value={state.profitMargin}
+              onChange={(e) => controller.setProfitMargin(Number(e.target.value))}
+              disabled={isLocked || state.isSaving}
             />
           </div>
 
           {/* Destructive Action with two-step inline confirm */}
           <div className="border border-rule rounded-card bg-paper-raised p-6">
-            {confirmDeleteProject ? (
+            {state.confirmDeleteProject ? (
               <div className="space-y-3">
                 <p className="text-xs text-danger">
                   Permanently delete this estimate?
                 </p>
+                {state.deleteProjectError && (
+                  <p className="text-xs text-danger font-medium">
+                    {state.deleteProjectError}
+                  </p>
+                )}
                 <div className="flex items-center gap-2">
-                  <Button variant="danger" size="sm" onClick={handleDeleteProject} className="flex-1">
-                    Confirm delete
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    disabled={state.isDeletingProject}
+                    onClick={() =>
+                      controller.handleDeleteProject(() => {
+                        router.push('/dashboard');
+                      })
+                    }
+                    className="flex-1"
+                  >
+                    {state.isDeletingProject ? 'Deleting...' : 'Confirm delete'}
                   </Button>
-                  <Button variant="quiet" size="sm" onClick={() => setConfirmDeleteProject(false)}>
+                  <Button
+                    variant="quiet"
+                    size="sm"
+                    disabled={state.isDeletingProject}
+                    onClick={handleCancelDeleteProject}
+                  >
                     Cancel
                   </Button>
                 </div>
               </div>
             ) : (
               <Button
+                ref={deleteTriggerRef}
                 variant="danger"
                 size="sm"
-                onClick={() => setConfirmDeleteProject(true)}
+                onClick={() => controller.setConfirmDeleteProject(true)}
                 className="w-full"
               >
                 Delete estimate
