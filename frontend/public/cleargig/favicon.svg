@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" fill="none">
+  <rect width="32" height="32" rx="6" fill="#201E1A"/>
+  <!-- Thin light squared document bracket with folded upper-right corner -->
+  <path d="M8 8h10l6 6v10H8V8z" stroke="#F5F0E6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M18 8v6h6" stroke="#F5F0E6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <line x1="12" y1="17" x2="20" y2="17" stroke="#A98A5D" stroke-width="2" stroke-linecap="round"/>
+  <line x1="12" y1="21" x2="17" y2="21" stroke="#A98A5D" stroke-width="2" stroke-linecap="round"/>
+</svg>

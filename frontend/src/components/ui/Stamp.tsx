@@ -7,28 +7,27 @@ export type StampProps = {
 };
 
 export function Stamp({ status, className = "" }: StampProps) {
-  let colorClass = "text-ink-muted";
+  let colorClass = "text-ink-muted border-rule";
   switch (status) {
     case "ACCEPTED":
-      colorClass = "text-accent";
+      colorClass = "text-forest border-forest/40 bg-accent-wash/30";
       break;
     case "DRAFT":
-      colorClass = "text-ink-muted";
+      colorClass = "text-ink-muted border-rule-strong bg-transparent";
       break;
     case "SENT":
-      colorClass = "text-ink";
+      colorClass = "text-ink border-ink/40 bg-paper-sunken/50";
       break;
     case "REJECTED":
-      colorClass = "text-danger";
+      colorClass = "text-danger border-danger/40 bg-danger/5";
       break;
   }
 
   return (
     <span
-      className={`inline-flex items-center justify-center border border-rule-strong rounded-control bg-transparent px-2 py-0.5 text-xs font-medium uppercase tracking-wider ${colorClass} ${className}`.trim()}
+      className={`inline-flex items-center justify-center border rounded-control px-2 py-0.5 text-xs font-mono font-medium uppercase tracking-wider ${colorClass} ${className}`.trim()}
     >
       {status}
     </span>
   );
 }
-

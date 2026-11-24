@@ -14,4 +14,3 @@ export function Rule({ strong = false, className = "", ...props }: RuleProps) {
     />
   );
 }
-
