@@ -9,6 +9,7 @@ The historical Ledger design specification (`docs/superpowers/specs/2026-11-03-c
 - **No prices on `/showcase`**: The showcase demonstrates scope, deliverables, workstreams, ongoing work, and document readiness without rates, prices, savings amounts, or monetary figures in any hero sheet, interactive example, mini workspace, or preview. Financial figures and formulas (`computeTotals`, `computeAudit`) remain active in the estimator and workspace.
 - **Showcase typography exception**: Geist Sans and Geist Mono remain standard; a narrow system serif display role (`Georgia, 'Times New Roman', serif`, roman, normal weight) is permitted solely for selected showcase phrases as specified in `design.md`.
 - **Approved media & static shadow exceptions**: Curated architectural photography under `public/cleargig/` and restrained static paper shadows/perspective are permitted on `/showcase` as specified in `design.md`.
+- **Data Persistence & Scope Limits**: Workspace saving operates via sequential client, project, and line item REST requests with partial-save recovery, not atomic transactions. The application operates without user authentication or private accounts.
 
 ---
 
@@ -40,7 +41,7 @@ The following libraries and patterns remain **strictly forbidden**:
 - **Dependencies**: No new dependencies may be added. The removed packages (three, lenis, gsap, etc.) must never be reinstalled.
 
 ### 4. Verification Gates
-Before proposing or committing changes:
+Verified on Node v24.22.1 before proposing or committing changes:
 ```bash
 # Type check (incremental false)
 node node_modules/typescript/bin/tsc --noEmit --incremental false
