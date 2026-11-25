@@ -15,6 +15,7 @@ import { Field } from '@/components/ui/Field';
 import LineItemTable from '@/components/LineItemTable';
 import { EstimateSummary } from '@/components/EstimateSummary';
 import { FinOpsAudit } from '@/components/FinOpsAudit';
+import { buildAuditExportUrl, DEFAULT_MONTHLY_SPEND, DEFAULT_SAVINGS_RATE } from '@/lib/audit-scenario';
 
 export default function ProjectDetail() {
   const { id } = useParams() as { id: string };
@@ -47,6 +48,14 @@ function ProjectDetailContent({ id }: { id: string }) {
 
   const deleteTriggerRef = useRef<HTMLButtonElement | null>(null);
 
+  const [auditScenario, setAuditScenario] = React.useState<{
+    monthlySpend: number;
+    savingsRate: number;
+  }>({
+    monthlySpend: DEFAULT_MONTHLY_SPEND,
+    savingsRate: DEFAULT_SAVINGS_RATE,
+  });
+
   const handleCancelDeleteProject = () => {
     controller.setConfirmDeleteProject(false);
     // Return focus logically to the delete trigger button
@@ -58,7 +67,8 @@ function ProjectDetailContent({ id }: { id: string }) {
   };
 
   const handleExportAudit = () => {
-    window.open(`/projects/${id}/document?variant=audit`, '_blank');
+    const url = buildAuditExportUrl(id, auditScenario);
+    window.open(url, '_blank');
   };
 
   if (state.isLoading) {
@@ -443,6 +453,9 @@ function ProjectDetailContent({ id }: { id: string }) {
               defaultMonthlySpend={
                 currentTotals.recurringMonthly > 0 ? currentTotals.recurringMonthly : 12500
               }
+              monthlySpend={auditScenario.monthlySpend}
+              savingsRate={auditScenario.savingsRate}
+              onScenarioChange={setAuditScenario}
             />
           )}
         </div>

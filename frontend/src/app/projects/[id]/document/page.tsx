@@ -10,6 +10,7 @@ import { DocumentShell } from '@/components/DocumentShell';
 import { DocumentEstimate } from '@/components/DocumentEstimate';
 import { DocumentAudit } from '@/components/DocumentAudit';
 import { Button } from '@/components/ui/Button';
+import { parseAuditScenario } from '@/lib/audit-scenario';
 
 function DocumentContent() {
   const params = useParams();
@@ -30,7 +31,7 @@ function DocumentContent() {
         if (!cancelled) {
           setProject(data);
         }
-      } catch (err) {
+      } catch {
         if (!cancelled) {
           setNotFound(true);
         }
@@ -86,6 +87,11 @@ function DocumentContent() {
   const clientName = project.client?.name || 'Untitled Client';
   const isAudit = variant === 'audit';
 
+  const defaultSpend = totals.recurringMonthly > 0 ? totals.recurringMonthly : 12500;
+  const validatedScenario = parseAuditScenario(searchParams, {
+    defaultMonthlySpend: defaultSpend,
+  });
+
   return (
     <div>
       {/* Top print/navigation toolbar - hidden in print */}
@@ -108,9 +114,8 @@ function DocumentContent() {
       >
         {isAudit ? (
           <DocumentAudit
-            defaultMonthlySpend={
-              totals.recurringMonthly > 0 ? totals.recurringMonthly : 12500
-            }
+            defaultMonthlySpend={validatedScenario.monthlySpend}
+            savingsRate={validatedScenario.savingsRate}
           />
         ) : (
           <DocumentEstimate project={project} totals={totals} />
