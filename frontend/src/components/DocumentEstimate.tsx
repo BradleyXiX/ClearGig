@@ -14,15 +14,22 @@ export function DocumentEstimate({ project, totals }: DocumentEstimateProps) {
   return (
     <div className="space-y-8 print:space-y-4">
       {/* Ruled Line Items Table */}
-      <div className="overflow-x-auto print:overflow-visible">
-        <table className="w-full text-left text-sm border-collapse print:text-xs">
+      <div className="overflow-x-auto print:overflow-visible print:w-full">
+        <table className="w-full text-left text-sm border-collapse print:text-xs table-fixed print:table-fixed">
+          <colgroup>
+            <col className="w-auto" />
+            <col className="w-28 print:w-24" />
+            <col className="w-20 print:w-16" />
+            <col className="w-24 print:w-20" />
+            <col className="w-28 print:w-24" />
+          </colgroup>
           <thead>
-            <tr className="border-b border-rule-strong text-xs font-mono uppercase tracking-wider text-ink-muted print:break-inside-avoid">
+            <tr className="border-b border-rule-strong text-xs font-mono uppercase tracking-wider text-ink-muted">
               <th className="py-3 pr-4 font-medium">Description</th>
-              <th className="py-3 px-4 font-medium">Category</th>
-              <th className="py-3 px-4 font-medium text-right">Hours</th>
-              <th className="py-3 px-4 font-medium text-right">Rate</th>
-              <th className="py-3 pl-4 font-medium text-right">Amount</th>
+              <th className="py-3 px-3 font-medium">Category</th>
+              <th className="py-3 px-3 font-medium text-right">Hours</th>
+              <th className="py-3 px-3 font-medium text-right">Rate</th>
+              <th className="py-3 pl-3 font-medium text-right">Amount</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-rule">
@@ -39,20 +46,20 @@ export function DocumentEstimate({ project, totals }: DocumentEstimateProps) {
               lineItems.map((item) => {
                 const amount = item.estimatedHours * item.hourlyRate;
                 return (
-                  <tr key={item.id} className="h-12 text-ink print:break-inside-avoid">
-                    <td className="py-3 pr-4 font-medium break-words max-w-xs sm:max-w-md">
+                  <tr key={item.id} className="h-12 text-ink">
+                    <td className="py-3 pr-4 font-medium break-words">
                       {item.description}
                     </td>
-                    <td className="py-3 px-4 font-mono text-xs text-ink-muted uppercase">
+                    <td className="py-3 px-3 font-mono text-xs text-ink-muted uppercase whitespace-nowrap">
                       {item.category}
                     </td>
-                    <td className="py-3 px-4 font-mono tabular-nums text-right">
+                    <td className="py-3 px-3 font-mono tabular-nums text-right whitespace-nowrap">
                       {item.estimatedHours}
                     </td>
-                    <td className="py-3 px-4 font-mono tabular-nums text-right text-ink-muted">
+                    <td className="py-3 px-3 font-mono tabular-nums text-right text-ink-muted whitespace-nowrap">
                       ${item.hourlyRate}/hr
                     </td>
-                    <td className="py-3 pl-4 font-mono tabular-nums text-right font-medium">
+                    <td className="py-3 pl-3 font-mono tabular-nums text-right font-medium whitespace-nowrap">
                       ${amount.toLocaleString('en-US', { maximumFractionDigits: 0 })}
                       {item.isRecurring && (
                         <span className="text-xs text-ink-muted ml-1">/mo</span>

@@ -91,12 +91,30 @@ body {
     page-break-inside: avoid;
   }
 
+  table {
+    width: 100% !important;
+    table-layout: fixed !important;
+    border-collapse: collapse !important;
+  }
+
   thead {
-    display: table-header-group;
+    display: table-header-group !important;
   }
 
   tfoot {
-    display: table-footer-group;
+    display: table-footer-group !important;
+  }
+
+  tbody {
+    display: table-row-group !important;
+  }
+
+  /* Ensure overflow containers never create scroll containers or clip in print */
+  .overflow-x-auto,
+  [class*="overflow"] {
+    overflow: visible !important;
+    overflow-x: visible !important;
+    overflow-y: visible !important;
   }
 
   /* Preserve full visibility without clipping or forced one-page truncation */

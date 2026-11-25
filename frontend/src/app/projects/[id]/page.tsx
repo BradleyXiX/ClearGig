@@ -58,8 +58,10 @@ function ProjectDetailContent({ id }: { id: string }) {
 
   const handleCancelDeleteProject = () => {
     controller.setConfirmDeleteProject(false);
-    // Return focus logically to the delete trigger button
-    deleteTriggerRef.current?.focus();
+    // Return focus logically to the delete trigger button after React re-renders it
+    requestAnimationFrame(() => {
+      deleteTriggerRef.current?.focus();
+    });
   };
 
   const handleExportEstimate = () => {
