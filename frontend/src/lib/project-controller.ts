@@ -66,6 +66,7 @@ export function createProjectController(options: ProjectControllerOptions) {
   let disposed = false;
   let activeSessionId = 0;
   let activeGeneration = 0;
+  let committedMutationVersion = 0;
 
   let state: ProjectControllerState = {
     project: null,
@@ -232,6 +233,7 @@ export function createProjectController(options: ProjectControllerOptions) {
       if (disposed) return;
       const thisSession = activeSessionId;
       const thisGen = ++activeGeneration;
+      const readBaselineVersion = committedMutationVersion;
 
       // Only show top-level isLoading if we don't already have project data
       state = {
@@ -248,8 +250,17 @@ export function createProjectController(options: ProjectControllerOptions) {
           return;
         }
 
-        // If a newer mutation has already updated project data, do not overwrite with older read
-        latestCommittedProjectDataVersion++;
+        // Stale-read protection: If a mutation committed while this read was in flight,
+        // do not overwrite the newer mutation result with stale data.
+        if (readBaselineVersion < committedMutationVersion) {
+          // Read was superseded by a committed mutation; keep newer state
+          state = {
+            ...state,
+            isLoading: false,
+          };
+          notify();
+          return;
+        }
 
         // If preserveDirtyDraft is requested, keep user's edited adjustment fields intact
         const shouldPreserveDraft = options?.preserveDirtyDraft && state.isDirty;
@@ -300,7 +311,6 @@ export function createProjectController(options: ProjectControllerOptions) {
           msg = err.message;
         }
 
-        // If we already have a loaded project, preserve that project data rather than blanking it
         state = {
           ...state,
           isLoading: false,
@@ -336,10 +346,12 @@ export function createProjectController(options: ProjectControllerOptions) {
           status: submittedStatus,
         });
 
-        activeMutation = null;
-        if (disposed || activeSessionId !== thisSession) return;
+        if (disposed || activeSessionId !== thisSession) {
+          activeMutation = null;
+          return;
+        }
 
-        latestCommittedProjectDataVersion++;
+        committedMutationVersion++;
 
         state = {
           ...state,
@@ -352,10 +364,13 @@ export function createProjectController(options: ProjectControllerOptions) {
           saveSuccessMessage: 'Project adjustments saved successfully.',
           mutationCommittedRefreshError: null,
         };
+        activeMutation = null;
         notify();
       } catch (err: unknown) {
-        activeMutation = null;
-        if (disposed || activeSessionId !== thisSession) return;
+        if (disposed || activeSessionId !== thisSession) {
+          activeMutation = null;
+          return;
+        }
         const msg = err instanceof Error ? err.message : 'Failed to save project adjustments';
         // Note: Dirty values are strictly preserved
         state = {
@@ -363,6 +378,7 @@ export function createProjectController(options: ProjectControllerOptions) {
           isSaving: false,
           saveError: msg,
         };
+        activeMutation = null;
         notify();
       }
     },
@@ -392,6 +408,13 @@ export function createProjectController(options: ProjectControllerOptions) {
           is_recurring: isRecurring,
         });
 
+        if (disposed || activeSessionId !== thisSession) {
+          activeMutation = null;
+          return;
+        }
+
+        committedMutationVersion++;
+
         // Reset form on write success
         state = {
           ...state,
@@ -404,28 +427,33 @@ export function createProjectController(options: ProjectControllerOptions) {
           },
         };
 
-        // Note: write has committed! Now refresh project while keeping draft intact
+        // Mutation lock remains held through add read reconciliation!
+        // Refresh project data while strictly preserving dirty draft adjustments
+        await controller.loadProject({ preserveDirtyDraft: true });
+
+        if (disposed || activeSessionId !== thisSession) {
+          activeMutation = null;
+          return;
+        }
+
+        if (state.loadError) {
+          state = {
+            ...state,
+            mutationCommittedRefreshError: 'Line item was saved, but refreshing project ledger failed. Click Retry to reload.',
+          };
+        }
+
         activeMutation = null;
         state = {
           ...state,
           isAddingLineItem: false,
         };
         notify();
-
-        if (disposed || activeSessionId !== thisSession) return;
-
-        // Refresh project data while strictly preserving dirty draft adjustments
-        await controller.loadProject({ preserveDirtyDraft: true });
-        if (state.loadError && !disposed && activeSessionId === thisSession) {
-          state = {
-            ...state,
-            mutationCommittedRefreshError: 'Line item was saved, but refreshing project ledger failed. Click Retry to reload.',
-          };
-          notify();
-        }
       } catch (err: unknown) {
-        activeMutation = null;
-        if (disposed || activeSessionId !== thisSession) return;
+        if (disposed || activeSessionId !== thisSession) {
+          activeMutation = null;
+          return;
+        }
         const msg = err instanceof Error ? err.message : 'Failed to add line item';
         // Form inputs remain preserved on rejected write
         state = {
@@ -433,6 +461,7 @@ export function createProjectController(options: ProjectControllerOptions) {
           isAddingLineItem: false,
           addLineItemError: msg,
         };
+        activeMutation = null;
         notify();
       }
     },
@@ -441,7 +470,6 @@ export function createProjectController(options: ProjectControllerOptions) {
       if (activeMutation !== null) return;
 
       activeMutation = 'delete-item';
-      deletingItemIdInFlight = itemId;
       state = {
         ...state,
         deletingLineItemId: itemId,
@@ -453,36 +481,48 @@ export function createProjectController(options: ProjectControllerOptions) {
 
       try {
         await api.deleteLineItem(itemId);
-        deletingItemIdInFlight = null;
-        activeMutation = null;
 
+        if (disposed || activeSessionId !== thisSession) {
+          activeMutation = null;
+          return;
+        }
+
+        committedMutationVersion++;
+
+        // Mutation lock remains held through delete read reconciliation!
+        // Refresh project data while strictly preserving dirty draft adjustments
+        await controller.loadProject({ preserveDirtyDraft: true });
+
+        if (disposed || activeSessionId !== thisSession) {
+          activeMutation = null;
+          return;
+        }
+
+        if (state.loadError) {
+          state = {
+            ...state,
+            mutationCommittedRefreshError: 'Line item was deleted, but refreshing project ledger failed. Click Retry to reload.',
+          };
+        }
+
+        activeMutation = null;
         state = {
           ...state,
           deletingLineItemId: null,
         };
         notify();
-
-        if (disposed || activeSessionId !== thisSession) return;
-
-        // Refresh project data while strictly preserving dirty draft adjustments
-        await controller.loadProject({ preserveDirtyDraft: true });
-        if (state.loadError && !disposed && activeSessionId === thisSession) {
-          state = {
-            ...state,
-            mutationCommittedRefreshError: 'Line item was deleted, but refreshing project ledger failed. Click Retry to reload.',
-          };
-          notify();
-        }
       } catch (err: unknown) {
-        deletingItemIdInFlight = null;
-        activeMutation = null;
-        if (disposed || activeSessionId !== thisSession) return;
+        if (disposed || activeSessionId !== thisSession) {
+          activeMutation = null;
+          return;
+        }
         const msg = err instanceof Error ? err.message : 'Failed to delete line item';
         state = {
           ...state,
           deletingLineItemId: null,
           lineItemError: msg,
         };
+        activeMutation = null;
         notify();
       }
     },

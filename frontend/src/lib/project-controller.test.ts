@@ -448,6 +448,109 @@ test("concurrent double-submits and rejected-write form content preservation", a
   assert.equal(state.isAddingLineItem, false);
 });
 
+test("delayed read started before adjustment save cannot overwrite saved state when resolving late", async () => {
+  const { mockApi } = createMockApi();
+
+  let resolveStaleRead!: (p: Project) => void;
+  const staleReadPromise = new Promise<Project>((resolve) => {
+    resolveStaleRead = resolve;
+  });
+
+  let readCount = 0;
+  mockApi.getProjectById = async (id) => {
+    readCount++;
+    if (readCount === 1) {
+      // First read is delayed
+      return staleReadPromise;
+    }
+    return createMockProject({ id, contingencyPercentage: 35, profitMargin: 25 });
+  };
+
+  const controller = createProjectController({ projectId: "p-stale-read", api: mockApi });
+  const initialLoadPromise = controller.loadProject();
+
+  // User edits adjustments
+  controller.setContingencyPercentage(35);
+  controller.setProfitMargin(25);
+  assert.equal(controller.isDirty(), true);
+
+  // User saves adjustments and save resolves first
+  await controller.handleSaveProject();
+  assert.equal(controller.getState().contingencyPercentage, 35);
+  assert.equal(controller.getState().profitMargin, 25);
+  assert.equal(controller.getState().saveSuccessMessage, "Project adjustments saved successfully.");
+
+  // Now the stale first read finally resolves with older values (15, 10)
+  resolveStaleRead(createMockProject({ id: "p-stale-read", contingencyPercentage: 15, profitMargin: 10 }));
+  await initialLoadPromise;
+
+  // Stale read must NOT overwrite the saved adjustments or project
+  const finalState = controller.getState();
+  assert.equal(finalState.contingencyPercentage, 35, "Saved contingency 35 must not be overwritten by stale read");
+  assert.equal(finalState.profitMargin, 25, "Saved margin 25 must not be overwritten by stale read");
+  assert.equal(finalState.saveSuccessMessage, "Project adjustments saved successfully.");
+});
+
+test("competing mutation attempted during addLineItem post-write refresh is rejected by held lock", async () => {
+  const { mockApi } = createMockApi();
+
+  let signalRefreshStarted!: () => void;
+  const refreshStarted = new Promise<void>((resolve) => {
+    signalRefreshStarted = resolve;
+  });
+
+  let resolveRefresh!: (p: Project) => void;
+  const refreshFinished = new Promise<Project>((resolve) => {
+    resolveRefresh = resolve;
+  });
+
+  let readCount = 0;
+  mockApi.getProjectById = async (id) => {
+    readCount++;
+    if (readCount === 2) {
+      // Post-add refresh
+      signalRefreshStarted();
+      return refreshFinished;
+    }
+    return createMockProject({ id });
+  };
+
+  const controller = createProjectController({ projectId: "p-lock-refresh", api: mockApi });
+  await controller.loadProject();
+
+  controller.setLineItemForm({
+    category: "FRONTEND",
+    description: "New Item",
+    estimatedHours: "2",
+    hourlyRate: "120",
+  });
+
+  const addPromise = controller.handleAddLineItem();
+
+  // Wait until add write has succeeded and refresh read is in flight
+  await refreshStarted;
+
+  // Lock must still be held!
+  assert.equal(controller.isMutationPending(), true, "Mutation lock must be held during refresh reconciliation");
+
+  // Competing save attempted during refresh reconciliation
+  controller.setContingencyPercentage(50);
+  const saveResult = controller.handleSaveProject();
+  await saveResult;
+  assert.equal(controller.getState().isSaving, false, "Competing save rejected during refresh");
+
+  // Competing delete attempted during refresh reconciliation
+  const deleteResult = controller.handleDeleteLineItem("item-1");
+  await deleteResult;
+  assert.equal(controller.getState().deletingLineItemId, null, "Competing delete rejected during refresh");
+
+  // Complete refresh
+  resolveRefresh(createMockProject({ id: "p-lock-refresh" }));
+  await addPromise;
+
+  assert.equal(controller.isMutationPending(), false, "Mutation lock released after refresh completes");
+});
+
 test("route replacement A -> B with delayed A response: B owns state, A callbacks are inert after disposal", async () => {
   const { mockApi } = createMockApi();
 
