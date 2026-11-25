@@ -13,16 +13,18 @@
 
 ---
 
-## ✨ Features
+## ✨ Features & Application Routes
 
-- **Project Estimation Dashboard** — Create and manage client project estimates with real-time cost calculations
-- **Line Item Breakdown** — Categorize work into Frontend, Backend, Cloud/DevOps, and Maintenance
-- **Recurring vs One-Time Costs** — Separate MRR (Monthly Recurring Revenue) from project-based fees
-- **Contingency Buffer** — Configurable % buffer to account for scope creep (0–50%)
-- **Profit Margin Control** — Global margin slider applied across the full estimate (0–100%)
-- **Estimate Status Lifecycle** — Track estimates through `DRAFT → SENT → ACCEPTED / REJECTED`
-- **Client Management** — Create and associate clients with projects inline
-- **Auto-Locking** — Estimates lock for editing once sent or accepted
+ClearGig provides a unified public showcase and an authentic, protected contractor estimating workspace:
+
+| Route | Role | Description & Data Boundaries |
+|---|---|---|
+| `/showcase` | **Public Showcase** | Public landing page presenting contractor scope estimation, workstreams, interactive sample scenarios (`Website refresh`, `Product build`), and document previews. **Strictly price-free**: zero currency figures, rates, or dollar totals; no API or backend dependencies required for full initial paint. |
+| `/` | **Estimate Wizard** | Five-step guided creation flow (`CLIENT → SCOPE → RATES → RECURRING → REVIEW`) with atomic client persistence, in-flight mutation locks, partial-save recovery, and graceful storage quota handling. |
+| `/dashboard` | **Workspace Overview** | Client ledger and estimate registry displaying project statuses, one-time base sums, and recurring totals. Handles empty states, loading skeletons, and connection retry states. |
+| `/projects/[id]` | **Project Editor & Audit** | Full estimate management with line-item CRUD, inline contingency/profit margin adjustments, status lifecycle transitions (`DRAFT → SENT → ACCEPTED / REJECTED`), and an interactive FinOps audit projection tab. |
+| `/projects/[id]/document` | **Printable Estimate** | Branded, publication-ready contractor estimate document with repeated table headers across multi-page page breaks, totals breakdown, and client signature authorization line. |
+| `/projects/[id]/document?variant=audit` | **Printable Audit** | Branded FinOps audit document showing baseline annual run-rates, projected savings, Net Present Value, and estimated client first-year net savings. |
 
 ---
 
@@ -41,7 +43,7 @@ ClearGig is 100% hosted on free cloud tiers:
 
 | Layer | Service | Details |
 |---|---|---|
-| Frontend | [Vercel](https://vercel.com) | Next.js 16, React 19, Tailwind CSS |
+| Frontend | [Vercel](https://vercel.com) | Next.js 16 (App Router), React 19, Tailwind CSS 4, Geist Sans & Mono |
 | Backend API | [Render](https://render.com) | Node.js Express 5, Prisma ORM (Free Web Service) |
 | Database | [Supabase](https://supabase.com) | PostgreSQL 15 (Free Tier) |
 | CI / Automation | GitHub Actions | Automated Linting, Prisma Generation, and Build verification |
@@ -54,9 +56,11 @@ ClearGig is 100% hosted on free cloud tiers:
 ClearGig/
 ├── frontend/               # Next.js app (deployed to Vercel)
 │   ├── src/
-│   │   ├── app/            # Pages (App Router)
-│   │   ├── components/     # Reusable UI components
-│   │   └── services/       # API client (api.ts)
+│   │   ├── app/            # App Router pages (/showcase, /, /dashboard, /projects/[id])
+│   │   ├── components/     # UI components (showcase, dashboard, UI primitives)
+│   │   ├── lib/            # Business math (totals, audit, controllers, WAAPI motion)
+│   │   └── services/       # Resilient REST API client (api.ts)
+│   ├── scripts/            # Mock API fixtures and test runners
 │   ├── vercel.json         # Vercel configuration
 │   └── .env.example
 ├── backend/                # Express REST API (deployed to Render)
@@ -66,9 +70,11 @@ ClearGig/
 │   │   └── schema.prisma   # Database models configured for Supabase
 │   ├── render.yaml         # Render blueprint service configuration
 │   └── .env.example
+├── docs/                   # Design specifications & Considered Work packet
+│   └── design-v2/          # Canonical execution plan, assets manifest, and verification logs
+├── design.md               # Authoritative Considered Work specification
 ├── render.yaml             # Root Render Blueprint specification
-├── docs/                   # Design & specification documents
-├── docker-compose.yml      # Local development stack
+├── docker-compose.yml      # Local development PostgreSQL stack
 └── .github/
     └── workflows/
         └── deploy.yml      # GitHub Actions CI workflow
@@ -76,7 +82,7 @@ ClearGig/
 
 ---
 
-## 🚀 Local Development
+## 🚀 Local Development & Verification
 
 ### Prerequisites
 
@@ -91,25 +97,7 @@ git clone https://github.com/BradleyXiX/ClearGig.git
 cd ClearGig
 ```
 
-### 2. Start the local database (or connect to Supabase)
-
-```bash
-docker compose up -d db
-```
-
-### 3. Set up the backend
-
-```bash
-cd backend
-cp .env.example .env   # Fill in your DATABASE_URL (local or Supabase)
-npm install
-npx prisma migrate dev
-npm run dev
-```
-
-> Backend runs at `http://localhost:5001` (or configured PORT)
-
-### 4. Set up the frontend
+### 2. Set up and run the frontend
 
 ```bash
 cd frontend
@@ -118,73 +106,75 @@ npm install
 npm run dev
 ```
 
-> Frontend runs at `http://localhost:3000`
+> Frontend dev server runs at `http://localhost:3000`. Navigate to `http://localhost:3000/showcase` for the public showcase or `http://localhost:3000/` for the estimate wizard.
 
-### Environment Variables
+### 3. Run Quality & Verification Gates
 
-**Backend (`backend/.env`)**
+From `frontend/`:
 
-```env
-PORT=5001
-DATABASE_URL="postgresql://postgres:[PASSWORD]@db.[PROJECT-REF].supabase.co:5432/postgres"
-FRONTEND_URL=http://localhost:3000
+```bash
+# Type check (must exit 0 with 0 errors)
+node node_modules/typescript/bin/tsc --noEmit --incremental false
+
+# Unit & controller tests (99 tests across math, controllers, API resilience, and showcase)
+node --test --test-timeout=5000 src/lib/*.test.ts src/services/*.test.ts
+
+# Production build verification
+npm run build
 ```
 
-**Frontend (`frontend/.env.local`)**
+### 4. Optional: Local Backend & Database Stack
 
-```env
-NEXT_PUBLIC_API_URL=http://localhost:5001/api/v1
+```bash
+# Start local PostgreSQL
+docker compose up -d db
+
+# Start backend
+cd ../backend
+cp .env.example .env
+npm install
+npx prisma migrate dev
+npm run dev
 ```
+
+> Backend runs at `http://localhost:5001`.
 
 ---
 
-## 🌐 Deployment to Free Platforms
+## 🔬 Measured Verification & Performance Observations
 
-### 1. Database (Supabase)
-1. Create a free project on [Supabase](https://supabase.com).
-2. Under **Project Settings → Database**, copy the PostgreSQL connection string URI.
-3. Use this URI as your `DATABASE_URL`.
+Automated end-to-end browser, print, and timeline verification was conducted in November 2026 using Playwright Chromium and Poppler `pdftoppm` against an isolated production preview build (`next start -p 3005`):
 
-### 2. Backend (Render Free Tier)
-1. In [Render](https://render.com), create a new Blueprint or Web Service connecting your GitHub repository.
-2. Render detects `render.yaml` automatically.
-3. Set the environment variable:
-   - `DATABASE_URL`: Your Supabase connection string.
-   - `FRONTEND_URL`: Your Vercel frontend URL (e.g. `https://cleargig.vercel.app`).
-4. Render deploys the backend service with health checks at `/api/v1/health`.
-
-### 3. Frontend (Vercel)
-1. In [Vercel](https://vercel.com), import the repository.
-2. Set the **Root Directory** to `frontend`.
-3. Add the environment variable:
-   - `NEXT_PUBLIC_API_URL`: Your Render backend URL with `/api/v1` (e.g. `https://cleargig-backend.onrender.com/api/v1`).
-4. Deploy!
-
----
-
-## ⚙️ CI/CD Pipeline
-
-Every push or pull request to `main` triggers automated GitHub Actions verification:
-
-```
-git push main
-    │
-    ├── 1. frontend-lint-and-build → ESLint & Next.js production build verification
-    └── 2. backend-validate        → Prisma client generation & syntax check
-```
-
-Deployments are handled automatically by Render and Vercel on push to `main`.
+- **Core Web Vitals (Local Unthrottled Loopback):**
+  - **LCP:** Median `256 ms` (LCP candidate: hero image `boardroom-desktop-1200.avif`, candidate area 280,140 CSS px²; meets <= 2500 ms target).
+  - **CLS:** Median `0.0000` (target <= 0.1).
+  - **TTFB:** Median `6 ms`.
+- **Bundle & Asset Transfer:**
+  - Total transferred JavaScript: `158.48 KB` (decoded: `536.87 KB` across 19 resources).
+  - CSS transferred: `9.01 KB`.
+- **Throttled Timeline & Long Tasks (4x CPU Slowdown Observation):**
+  - Captured CDP performance trace: `2.48 MB` JSON, `10,984 events`, `801 main-thread RunTasks`.
+  - Observed 19 main-thread tasks > 50 ms under 4x CPU throttling, max `821.51 ms` (initial bundle parse/hydration during cold navigation) and bounded interactive tasks between `54.73 ms` and `151.42 ms`.
+  - Synthetic scenario toggle latency (`pointerup` to next `requestAnimationFrame` render callback): mean `108.07 ms` over 6 alternating samples. *(Note: Approximate callback duration under synthetic 4x slowdown, not field INP or physical display presentation).*
+- **Print & PDF Geometry:**
+  - Multi-page estimate PDF (40 items): Verified 5 pages rendered with Poppler `pdftoppm` 26.07.0. Repeated table headers intact on all pages; totals and client signature block preserved on page 5 without clipping.
+  - Audit PDF: Clean 1-page financial projection summary.
+- **Detailed Evidence Dossier:**
+  - Full reports, Poppler raster PNGs, and traces are cataloged in `docs/design-v2/` and the dated external redesign receipt dossier at `outputs/cleargig-redesign/receipts/`.
 
 ---
 
-## 📖 Documentation
+## 📖 Documentation & Design Standards
 
 | Document | Description |
 |---|---|
-| [PRD](./docs/PRD.md) | Product requirements and user flows |
-| [Architecture](./docs/ARCHITECTURE.md) | System design and tech stack |
-| [Database Schema](./docs/DATABASE_SCHEMA.md) | Relational data models |
-| [API Specification](./docs/API_SPEC.md) | REST endpoints and payloads |
+| [design.md](./design.md) | **Authoritative Specification:** Considered Work design system, tokens, layout, and motion boundaries |
+| [docs/design-v2/START-HERE.md](./docs/design-v2/START-HERE.md) | Redesign packet navigation, role boundaries, and core guidelines |
+| [docs/design-v2/execution-plan.md](./docs/design-v2/execution-plan.md) | 16-task redesign sequence, architecture guardrails, and budget targets |
+| [docs/design-v2/assets-manifest.md](./docs/design-v2/assets-manifest.md) | Image asset roles, dimensions, AVIF/WebP responsive derivatives, and provenance |
+| [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) | Full system architecture and cloud infrastructure |
+| [docs/API_SPEC.md](./docs/API_SPEC.md) | REST API endpoints, schemas, and payload specifications |
+| [docs/PRD.md](./docs/PRD.md) | Product requirements and contractor user stories |
 
 ---
 
@@ -200,18 +190,8 @@ Client ──< Project ──< LineItem
 | `Project` | `id`, `title`, `status`, `contingencyPercentage`, `profitMargin`, `clientId` |
 | `LineItem` | `id`, `category`, `description`, `estimatedHours`, `hourlyRate`, `isRecurring`, `projectId` |
 
-**Project statuses:** `DRAFT` → `SENT` → `ACCEPTED` | `REJECTED`  
+**Project statuses:** `DRAFT` → `SENT` → `ACCEPTED` \| `REJECTED`  
 **Line item categories:** `FRONTEND`, `BACKEND`, `CLOUD`, `MAINTENANCE`
-
----
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/your-feature`
-3. Commit your changes: `git commit -m 'feat: add your feature'`
-4. Push to the branch: `git push origin feature/your-feature`
-5. Open a Pull Request
 
 ---
 
