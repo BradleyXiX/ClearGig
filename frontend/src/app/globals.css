@@ -76,7 +76,34 @@ body {
 }
 
 @media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
   .no-print {
     display: none !important;
+  }
+
+  /* Ensure page breaks don't split rows or headers inappropriately */
+  tr, .print\:break-inside-avoid {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  tfoot {
+    display: table-footer-group;
+  }
+
+  /* Preserve full visibility without clipping or forced one-page truncation */
+  .document-sheet {
+    max-width: none !important;
+    padding: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
   }
 }

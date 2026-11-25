@@ -14,10 +14,10 @@ export function DocumentEstimate({ project, totals }: DocumentEstimateProps) {
   return (
     <div className="space-y-8 print:space-y-4">
       {/* Ruled Line Items Table */}
-      <div className="overflow-x-auto">
-        <table className="w-full text-left text-sm border-collapse">
+      <div className="overflow-x-auto print:overflow-visible">
+        <table className="w-full text-left text-sm border-collapse print:text-xs">
           <thead>
-            <tr className="border-b border-rule-strong text-xs font-mono uppercase tracking-wider text-ink-muted">
+            <tr className="border-b border-rule-strong text-xs font-mono uppercase tracking-wider text-ink-muted print:break-inside-avoid">
               <th className="py-3 pr-4 font-medium">Description</th>
               <th className="py-3 px-4 font-medium">Category</th>
               <th className="py-3 px-4 font-medium text-right">Hours</th>
@@ -39,8 +39,8 @@ export function DocumentEstimate({ project, totals }: DocumentEstimateProps) {
               lineItems.map((item) => {
                 const amount = item.estimatedHours * item.hourlyRate;
                 return (
-                  <tr key={item.id} className="h-12 text-ink">
-                    <td className="py-3 pr-4 font-medium">
+                  <tr key={item.id} className="h-12 text-ink print:break-inside-avoid">
+                    <td className="py-3 pr-4 font-medium break-words max-w-xs sm:max-w-md">
                       {item.description}
                     </td>
                     <td className="py-3 px-4 font-mono text-xs text-ink-muted uppercase">
@@ -67,8 +67,8 @@ export function DocumentEstimate({ project, totals }: DocumentEstimateProps) {
       </div>
 
       {/* Summary section */}
-      <div className="flex justify-end pt-4">
-        <div className="w-full sm:w-80 space-y-3 font-mono text-sm">
+      <div className="flex justify-end pt-4 print:break-inside-avoid">
+        <div className="w-full sm:w-80 space-y-3 font-mono text-sm print:text-xs">
           <div className="flex justify-between items-center text-ink">
             <span className="font-sans text-xs uppercase tracking-wider text-ink-muted">
               Base cost
@@ -115,7 +115,7 @@ export function DocumentEstimate({ project, totals }: DocumentEstimateProps) {
             <span className="font-sans text-xs uppercase tracking-wider text-ink-muted">
               Total
             </span>
-            <span className="text-5xl font-mono font-semibold tabular-nums text-accent">
+            <span className="text-5xl print:text-3xl font-mono font-semibold tabular-nums text-accent">
               ${totals.total.toLocaleString('en-US', { maximumFractionDigits: 0 })}
             </span>
           </div>
