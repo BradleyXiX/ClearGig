@@ -14,7 +14,7 @@ const FAQS: FAQItem[] = [
   {
     question: "How do documents work?",
     answer:
-      "Open the saved project's estimate or audit document, then use browser print or save-to-PDF. No claim of generated legal contracts or e-signing.",
+      "Open the saved project's estimate or audit document, then use browser print or save-to-PDF. ClearGig does not provide legal contract drafting or electronic signatures.",
   },
   {
     question: "Are audit savings guaranteed?",

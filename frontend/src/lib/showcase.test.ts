@@ -399,7 +399,7 @@ test("Questions: renders three native details disclosures with exact Section 5F 
   assert.match(html, /How do documents work\?/);
   assert.match(
     html,
-    /Open the saved project&#x27;s estimate or audit document, then use browser print or save-to-PDF\. No claim of generated legal contracts or e-signing\.|Open the saved project's estimate or audit document, then use browser print or save-to-PDF\. No claim of generated legal contracts or e-signing\./
+    /Open the saved project&#x27;s estimate or audit document, then use browser print or save-to-PDF\. ClearGig does not provide legal contract drafting or electronic signatures\.|Open the saved project's estimate or audit document, then use browser print or save-to-PDF\. ClearGig does not provide legal contract drafting or electronic signatures\./
   );
 
   // Question 3: Are audit savings guaranteed?
