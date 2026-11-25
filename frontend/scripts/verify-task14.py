@@ -1,5 +1,5 @@
 """
-Task 14C Consolidated Browser, PDF, and Measured Verification Script (run-03)
+Task 14D Consolidated Browser, PDF, and Measured Verification Script (run-04)
 Executes full real-browser journeys against Next.js production preview (http://localhost:3005)
 Captures screenshots, generates real PDFs, renders PDF pages using Poppler pdftoppm,
 performs genuine lifecycle assertions, records CDP performance traces and browser timings,
@@ -13,12 +13,13 @@ import time
 import subprocess
 import gzip
 import re
+import threading
 from pathlib import Path
 from playwright.sync_api import sync_playwright, expect
 import pdfplumber
 
 BASE_URL = "http://localhost:3005"
-EVIDENCE_DIR = Path(r"C:\Users\Admin\Documents\Codex\2026-11-20\i-was-to-give-you-the\outputs\cleargig-redesign\task14\run-03")
+EVIDENCE_DIR = Path(r"C:\Users\Admin\Documents\Codex\2026-11-20\i-was-to-give-you-the\outputs\cleargig-redesign\task14\run-04")
 SCREENSHOTS_DIR = EVIDENCE_DIR / "screenshots"
 PDFS_DIR = EVIDENCE_DIR / "pdfs"
 RENDERED_PAGES_DIR = EVIDENCE_DIR / "rendered-pdf-pages"
@@ -46,7 +47,7 @@ results = {
 }
 
 def log(msg):
-    print(f"[VERIFY-14C] {msg}", flush=True)
+    print(f"[VERIFY-14D] {msg}", flush=True)
 
 def record_result(category, status, details=None):
     results["matrix"][category] = {
@@ -988,7 +989,21 @@ with sync_playwright() as p:
         cdp_client.send("Emulation.setCPUThrottlingRate", {"rate": 4})
         trace_file_path = EVIDENCE_DIR / "performance-trace.json"
 
-        # Start CDP Tracing for long tasks and layout
+        # Register CDP Tracing listeners BEFORE starting capture
+        trace_chunks = []
+        tracing_done = [False]
+
+        def on_data_collected(data):
+            events = data.get("value", [])
+            trace_chunks.extend(events)
+
+        def on_tracing_complete(data):
+            tracing_done[0] = True
+
+        cdp_client.on("Tracing.dataCollected", on_data_collected)
+        cdp_client.on("Tracing.tracingComplete", on_tracing_complete)
+
+        # Start CDP Tracing for long tasks and timeline events
         cdp_client.send("Tracing.start", {
             "categories": "-*,devtools.timeline,disabled-by-default-devtools.timeline,v8.execute",
             "options": "sampling-frequency=10000"
@@ -1010,27 +1025,89 @@ with sync_playwright() as p:
 
         p_cdp.goto(f"{BASE_URL}/showcase", wait_until="networkidle")
 
-        # Execute repeated representative interactions on scenario buttons
-        scenario_buttons = p_cdp.locator("button:has-text('Product build'), button:has-text('Retainer'), button:has-text('Fixed audit')")
-        for i in range(scenario_buttons.count()):
-            scenario_buttons.nth(i).click()
-            p_cdp.wait_for_timeout(100)
+        # Scroll Approach into view
+        approach_section = p_cdp.locator("section[aria-labelledby='approach-heading']")
+        approach_section.scroll_into_view_if_needed()
+        p_cdp.wait_for_timeout(200)
+
+        # Locate the two real scenario controls in Approach
+        btn_website = p_cdp.locator("button:has-text('Website refresh')").first
+        btn_product = p_cdp.locator("button:has-text('Product build')").first
+
+        sample_records = []
+        # Alternate between the two real controls for at least 6 measured interactions
+        for step in range(6):
+            target_btn = btn_product if step % 2 == 0 else btn_website
+            target_label = "Product build" if step % 2 == 0 else "Website refresh"
+            prev_samples_count = p_cdp.evaluate("() => window.__input_samples.length")
+
+            target_btn.click()
+
+            # Verify that aria-pressed changes to true and table updates
+            expect(target_btn).to_have_attribute("aria-pressed", "true")
+            p_cdp.wait_for_timeout(150)
+
+            cur_samples = p_cdp.evaluate("() => window.__input_samples")
+            sample_dur = cur_samples[-1] if len(cur_samples) > prev_samples_count else None
+            sample_records.append({
+                "iteration": step + 1,
+                "label": target_label,
+                "aria_pressed": "true",
+                "in_browser_pointerup_to_raf_ms": round(sample_dur, 2) if sample_dur is not None else None,
+                "timestamp_epoch": time.time()
+            })
 
         # Retrieve internal browser input-to-presentation latencies
         input_latencies = p_cdp.evaluate("() => window.__input_samples")
+        assert len(input_latencies) >= 6, f"Expected at least 6 input latency samples, got {len(input_latencies)}"
 
-        # Stop CDP trace and collect data
-        trace_chunks = []
-        cdp_client.on("Tracing.dataCollected", lambda data: trace_chunks.extend(data.get("value", [])))
+        # Stop CDP trace and pump Playwright event loop until Tracing.tracingComplete arrives
         cdp_client.send("Tracing.end")
+        t_wait_start = time.time()
+        while not tracing_done[0] and (time.time() - t_wait_start < 10.0):
+            p_cdp.wait_for_timeout(100)
 
-        # Wait briefly for tracing data events
-        time.sleep(1.0)
+        assert tracing_done[0], "CDP Tracing did not complete within 10s timeout"
+        assert len(trace_chunks) > 0, f"CDP Trace collected 0 events: {len(trace_chunks)}"
+
+        # Write trace JSON file
         with open(trace_file_path, "w", encoding="utf-8") as f_trace:
             json.dump({"traceEvents": trace_chunks}, f_trace)
 
-        # Analyze long tasks (>50ms) in collected trace events
-        long_tasks = [ev for ev in trace_chunks if ev.get("name") == "RunTask" and ev.get("dur", 0) > 50000]
+        trace_bytes = trace_file_path.stat().st_size
+        assert trace_bytes > 1000, f"Trace file is unexpectedly small: {trace_bytes} bytes"
+
+        # Parse trace events
+        # Identify renderer main thread via "thread_name": "CrRendererMain"
+        renderer_main_tid = None
+        for ev in trace_chunks:
+            if ev.get("name") == "thread_name" and ev.get("args", {}).get("name") == "CrRendererMain":
+                renderer_main_tid = ev.get("tid")
+                break
+
+        # If not found by name, pick the tid with the most RunTask events
+        if renderer_main_tid is None:
+            runtask_tids = {}
+            for ev in trace_chunks:
+                if ev.get("name") == "RunTask":
+                    tid = ev.get("tid")
+                    runtask_tids[tid] = runtask_tids.get(tid, 0) + 1
+            if runtask_tids:
+                renderer_main_tid = max(runtask_tids.items(), key=lambda x: x[1])[0]
+
+        # Collect event names on main thread and overall
+        main_thread_events = [ev for ev in trace_chunks if ev.get("tid") == renderer_main_tid] if renderer_main_tid else trace_chunks
+        main_runtasks = [ev for ev in main_thread_events if ev.get("name") == "RunTask"]
+        layout_events = [ev for ev in trace_chunks if ev.get("name") in ("Layout", "UpdateLayoutTree")]
+        paint_events = [ev for ev in trace_chunks if ev.get("name") in ("Paint", "CompositeLayers", "RasterTask")]
+
+        # Analyze long tasks (>50ms, i.e., >50,000 microseconds in CDP trace dur)
+        long_tasks = [ev for ev in main_runtasks if ev.get("dur", 0) > 50000]
+
+        # Compute trace window
+        ts_list = [ev.get("ts", 0) for ev in trace_chunks if ev.get("ts", 0) > 0]
+        trace_window_ms = round((max(ts_list) - min(ts_list)) / 1000.0, 1) if ts_list else 0
+
         ctx_cdp.close()
 
         mean_input_latency = round(sum(input_latencies) / len(input_latencies), 2) if input_latencies else None
@@ -1059,9 +1136,22 @@ with sync_playwright() as p:
             "throttled_4x_interactions": {
                 "samples_count": len(input_latencies),
                 "in_browser_input_to_frame_latencies_ms": input_latencies,
+                "sample_records": sample_records,
                 "mean_interaction_ms": mean_input_latency,
+                "trace_file": str(trace_file_path),
+                "trace_size_bytes": trace_bytes,
+                "total_trace_events": len(trace_chunks),
+                "trace_window_ms": trace_window_ms,
+                "renderer_main_tid": renderer_main_tid,
+                "observed_main_runtasks_count": len(main_runtasks),
+                "observed_layout_events_count": len(layout_events),
+                "observed_paint_events_count": len(paint_events),
                 "long_tasks_over_50ms_count": len(long_tasks),
-                "trace_file": str(trace_file_path)
+                "long_tasks": [{
+                    "name": t.get("name"),
+                    "dur_ms": round(t.get("dur", 0) / 1000.0, 2),
+                    "ts_ms": round(t.get("ts", 0) / 1000.0, 2)
+                } for t in long_tasks]
             }
         }
 
@@ -1070,6 +1160,10 @@ with sync_playwright() as p:
             "lcp_candidate": cold_runs[0]["lcp_candidate"],
             "median_cls": median_cls,
             "mean_interaction_ms": mean_input_latency,
+            "input_samples_count": len(input_latencies),
+            "total_trace_events": len(trace_chunks),
+            "trace_size_bytes": trace_bytes,
+            "observed_main_runtasks": len(main_runtasks),
             "long_tasks_count": len(long_tasks)
         })
     except Exception as e:
