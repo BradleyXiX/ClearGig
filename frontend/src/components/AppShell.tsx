@@ -6,7 +6,7 @@ import { BrandBar } from "./BrandBar";
 import { CONTACT_INFO } from "@/lib/contact";
 
 export interface AppShellProps {
-  children: React.ReactNode;
+  children?: React.ReactNode;
   pathname?: string;
 }
 

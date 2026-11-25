@@ -922,7 +922,11 @@ test("AppShell: renders compact no-print contact footer on standard app routes a
 
   // Standard app route: /dashboard
   const appHtml = ReactDOMServer.renderToStaticMarkup(
-    React.createElement(AppShell, { pathname: "/dashboard", children: React.createElement("div", null, "Dashboard Content") })
+    React.createElement(
+      AppShell,
+      { pathname: "/dashboard" },
+      React.createElement("div", null, "Dashboard Content")
+    )
   );
   assert.match(appHtml, /<main><div>Dashboard Content<\/div><\/main>/);
   assert.match(appHtml, /<footer[^>]*class="[^"]*no-print[^"]*"[^>]*>/);
@@ -936,7 +940,11 @@ test("AppShell: renders compact no-print contact footer on standard app routes a
 
   // Showcase route: /showcase (Showcase owns its complete footer; AppShell must not render a duplicate footer)
   const showcaseHtml = ReactDOMServer.renderToStaticMarkup(
-    React.createElement(AppShell, { pathname: "/showcase", children: React.createElement("div", null, "Showcase Content") })
+    React.createElement(
+      AppShell,
+      { pathname: "/showcase" },
+      React.createElement("div", null, "Showcase Content")
+    )
   );
   assert.doesNotMatch(showcaseHtml, /<main>/);
   assert.doesNotMatch(showcaseHtml, /<footer/);
