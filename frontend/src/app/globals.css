@@ -1,40 +1,73 @@
 @import "tailwindcss";
 
 :root {
-  --paper: #F7F4EE;
-  --paper-raised: #FFFDF8;
+  /* Considered Work Palette */
+  --canvas: #F4F0E8;
+  --paper: #FFFCF6;
+  --paper-muted: #E9E2D6;
   --paper-sunken: #EFEBE1;
-  --ink: #14140F;
-  --ink-muted: #5C5A52;
-  --rule: #D9D4C7;
-  --rule-strong: #B9B2A1;
+  --paper-raised: #FFFDF8;
+  --ink: #201E1A;
+  --ink-muted: #686158;
+  --rule: #CFC5B6;
+  --rule-strong: #8B8173;
+  --control-border: #8B8173;
+  --brass: #A98A5D;
+  --brass-ink: #705330;
+  --forest: #3E4B40;
   --accent: #1E4A3C;
   --accent-wash: #E7EDE8;
-  --danger: #8A2B1F;
+  --dark-canvas: #191916;
+  --on-dark: #F5F0E6;
+  --on-dark-muted: #C4B9A8;
+  --danger: #8C3228;
+  --focus-light: #3E4B40;
+  --focus-dark: #E0C6A1;
 }
 
 @theme inline {
+  --color-canvas: var(--canvas);
   --color-paper: var(--paper);
-  --color-paper-raised: var(--paper-raised);
+  --color-paper-muted: var(--paper-muted);
   --color-paper-sunken: var(--paper-sunken);
+  --color-paper-raised: var(--paper-raised);
   --color-ink: var(--ink);
   --color-ink-muted: var(--ink-muted);
   --color-rule: var(--rule);
   --color-rule-strong: var(--rule-strong);
+  --color-control-border: var(--control-border);
+  --color-brass: var(--brass);
+  --color-brass-ink: var(--brass-ink);
+  --color-forest: var(--forest);
   --color-accent: var(--accent);
   --color-accent-wash: var(--accent-wash);
+  --color-dark-canvas: var(--dark-canvas);
+  --color-on-dark: var(--on-dark);
+  --color-on-dark-muted: var(--on-dark-muted);
   --color-danger: var(--danger);
+  --color-focus-light: var(--focus-light);
+  --color-focus-dark: var(--focus-dark);
 
   --radius-card: 4px;
   --radius-control: 2px;
-  --ease-ledger: cubic-bezier(0.22, 1, 0.36, 1);
+  --radius-panel: 6px;
+  --radius-frame: 8px;
+
+  --ease-considered: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 body {
-  background: var(--paper);
+  background: var(--canvas);
   color: var(--ink);
   font-family: var(--font-geist-sans), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
+}
+
+/* System serif display role for selected showcase phrases only */
+.font-serif-display {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-style: normal;
+  font-weight: 400;
 }
 
 @page {
@@ -43,7 +76,52 @@ body {
 }
 
 @media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
   .no-print {
-    display: none;
+    display: none !important;
+  }
+
+  /* Ensure page breaks don't split rows or headers inappropriately */
+  tr, .print\:break-inside-avoid {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  table {
+    width: 100% !important;
+    table-layout: fixed !important;
+    border-collapse: collapse !important;
+  }
+
+  thead {
+    display: table-header-group !important;
+  }
+
+  tfoot {
+    display: table-footer-group !important;
+  }
+
+  tbody {
+    display: table-row-group !important;
+  }
+
+  /* Ensure overflow containers never create scroll containers or clip in print */
+  .overflow-x-auto,
+  [class*="overflow"] {
+    overflow: visible !important;
+    overflow-x: visible !important;
+    overflow-y: visible !important;
+  }
+
+  /* Preserve full visibility without clipping or forced one-page truncation */
+  .document-sheet {
+    max-width: none !important;
+    padding: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
   }
 }

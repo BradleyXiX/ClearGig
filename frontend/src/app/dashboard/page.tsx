@@ -1,24 +1,28 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
-import { api, type Project, type Client } from '@/services/api';
-import { computeTotals } from '@/lib/totals';
-import { Stamp } from '@/components/ui/Stamp';
-import { Button } from '@/components/ui/Button';
+import React, { useState, useEffect, useMemo } from "react";
+import Link from "next/link";
+import { api, type Project, type Client } from "@/services/api";
+import { computeTotals } from "@/lib/totals";
+import { EstimateLedger } from "@/components/dashboard/EstimateLedger";
+import { ClientTotalsRail, type ClientTotalItem } from "@/components/dashboard/ClientTotalsRail";
+import { DashboardError } from "@/components/dashboard/DashboardError";
 
 export default function DashboardPage() {
-  const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
-  useEffect(() => {
-    let cancelled = false;
+  const handleRetry = () => {
     setLoading(true);
     setError(null);
+    setReloadKey((k) => k + 1);
+  };
+
+  useEffect(() => {
+    let cancelled = false;
 
     Promise.all([api.getProjects(), api.getClients()])
       .then(([pData, cData]) => {
@@ -31,7 +35,7 @@ export default function DashboardPage() {
         if (cancelled) return;
         // Without this the page sat on its skeleton forever: "database is
         // offline" and "no estimates yet" looked identical.
-        setError(err instanceof Error ? err.message : 'Could not load estimates.');
+        setError(err instanceof Error ? err.message : "Could not load estimates.");
         setLoading(false);
       });
 
@@ -46,154 +50,73 @@ export default function DashboardPage() {
     return map;
   }, [clients]);
 
-  const clientTotals = useMemo(() => {
-    const totalsByClient = new Map<string, number>();
+  const clientTotals = useMemo<ClientTotalItem[]>(() => {
+    const totalsByClient = new Map<string, { total: number; recurringMonthly: number }>();
     for (const p of projects) {
       const t = computeTotals(p);
-      totalsByClient.set(p.clientId, (totalsByClient.get(p.clientId) ?? 0) + t.total);
+      const existing = totalsByClient.get(p.clientId) ?? { total: 0, recurringMonthly: 0 };
+      totalsByClient.set(p.clientId, {
+        total: existing.total + t.total,
+        recurringMonthly: existing.recurringMonthly + t.recurringMonthly,
+      });
     }
     return clients
-      .map((c) => ({
-        id: c.id,
-        name: c.name,
-        total: totalsByClient.get(c.id) ?? 0,
-      }))
-      .filter((c) => c.total > 0)
+      .map((c) => {
+        const item = totalsByClient.get(c.id) ?? { total: 0, recurringMonthly: 0 };
+        return {
+          id: c.id,
+          name: c.name,
+          total: item.total,
+          recurringMonthly: item.recurringMonthly,
+        };
+      })
+      .filter((c) => c.total > 0 || c.recurringMonthly > 0)
       .sort((a, b) => b.total - a.total);
   }, [clients, projects]);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
-      <div className="mb-8">
-        <h1 className="text-4xl font-semibold tracking-tight text-ink">
-          Estimates
-        </h1>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+      {/* Dashboard Header Hierarchy */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 sm:mb-10 pb-6 border-b border-rule">
+        <div>
+          <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight text-ink font-sans">
+            Estimates
+          </h1>
+          <p className="mt-1 text-sm sm:text-base text-ink-muted font-sans">
+            Your work, clearly accounted for.
+          </p>
+        </div>
+        <div className="shrink-0">
+          <Link
+            href="/"
+            className="inline-flex items-center justify-center px-4 py-2.5 rounded-control bg-ink text-on-dark font-medium text-sm hover:bg-ink-muted focus-visible:ring-2 focus-visible:ring-forest focus-visible:ring-offset-2 transition-colors duration-150 shadow-xs"
+          >
+            New estimate
+          </Link>
+        </div>
       </div>
 
       {error ? (
-        <div className="border border-rule rounded-card bg-paper-raised p-6 max-w-xl">
-          <h2 className="text-lg font-semibold text-ink">Could not load estimates</h2>
-          <p className="mt-2 text-sm text-ink-muted">{error}</p>
-          <p className="mt-2 text-sm text-ink-muted">
-            Nothing is lost. The API reads from the database, so it cannot list
-            anything while the database is unreachable.
-          </p>
-          <Button
-            variant="secondary"
-            className="mt-4"
-            onClick={() => setReloadKey((k) => k + 1)}
-          >
-            Try again
-          </Button>
-        </div>
+        <DashboardError error={error} onRetry={handleRetry} />
       ) : (
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Main Estimates Ledger */}
-        <div className="lg:col-span-2">
-          <div className="w-full overflow-x-auto">
-            <table className="w-full border-collapse text-left">
-              <thead>
-                <tr className="border-b border-rule text-xs font-medium uppercase tracking-wider text-ink-muted">
-                  <th className="py-2 pr-4">Description</th>
-                  <th className="py-2 px-4">Client</th>
-                  <th className="py-2 px-4">Status</th>
-                  <th className="py-2 px-4 text-right">Total</th>
-                  <th className="py-2 pl-4 text-right">Updated</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-rule">
-                {loading ? (
-                  [...Array(6)].map((_, i) => (
-                    <tr key={i} className="h-12 bg-paper-sunken animate-pulse">
-                      <td colSpan={5} />
-                    </tr>
-                  ))
-                ) : projects.length === 0 ? (
-                  <tr className="h-12">
-                    <td colSpan={5} className="py-4 text-center text-sm text-ink-muted">
-                      No estimates recorded.
-                    </td>
-                  </tr>
-                ) : (
-                  projects.map((p) => {
-                    const totals = computeTotals(p);
-                    const clientName = p.client?.name ?? clientMap.get(p.clientId) ?? "—";
-                    const updated = new Date(p.updatedAt || p.createdAt).toLocaleDateString("en-US", {
-                      month: "short",
-                      day: "numeric",
-                    });
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          {/* Main Estimates Ledger: 8/12 Columns */}
+          <div className="lg:col-span-8">
+            <EstimateLedger
+              projects={projects}
+              clientMap={clientMap}
+              loading={loading}
+            />
+          </div>
 
-                    return (
-                      <tr
-                        key={p.id}
-                        onClick={() => router.push(`/projects/${p.id}`)}
-                        className="h-12 cursor-pointer hover:bg-paper-sunken transition-colors duration-150"
-                      >
-                        <td className="py-3 pr-4 font-medium text-sm text-ink truncate max-w-xs">
-                          {p.title}
-                        </td>
-                        <td className="py-3 px-4 text-sm text-ink-muted">
-                          {clientName}
-                        </td>
-                        <td className="py-3 px-4">
-                          <Stamp status={p.status} />
-                        </td>
-                        <td className="py-3 px-4 text-right font-mono tabular-nums text-sm font-medium text-ink">
-                          ${totals.total.toLocaleString("en-US", { maximumFractionDigits: 0 })}
-                        </td>
-                        <td className="py-3 pl-4 text-right font-mono tabular-nums text-sm text-ink-muted">
-                          {updated}
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
+          {/* Client Totals Rail: 4/12 Columns */}
+          <div className="lg:col-span-4">
+            <ClientTotalsRail
+              clientTotals={clientTotals}
+              loading={loading}
+            />
           </div>
         </div>
-
-        {/* Client Totals Rail */}
-        <div>
-          <div className="border border-rule rounded-card bg-paper-raised p-4">
-            <h2 className="text-xs font-medium uppercase tracking-wider text-ink-muted mb-4">
-              Client totals
-            </h2>
-            <table className="w-full border-collapse text-left">
-              <thead>
-                <tr className="border-b border-rule text-xs font-medium uppercase tracking-wider text-ink-muted">
-                  <th className="py-2 pr-4">Client</th>
-                  <th className="py-2 pl-4 text-right">Total</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-rule">
-                {loading ? (
-                  [...Array(3)].map((_, i) => (
-                    <tr key={i} className="h-12 bg-paper-sunken animate-pulse">
-                      <td colSpan={2} />
-                    </tr>
-                  ))
-                ) : clientTotals.length === 0 ? (
-                  <tr className="h-12">
-                    <td colSpan={2} className="py-4 text-center text-sm text-ink-muted">
-                      No client totals.
-                    </td>
-                  </tr>
-                ) : (
-                  clientTotals.map((c) => (
-                    <tr key={c.id} className="h-12">
-                      <td className="py-3 pr-4 text-sm text-ink">{c.name}</td>
-                      <td className="py-3 pl-4 text-right font-mono tabular-nums text-sm font-medium text-ink">
-                        ${c.total.toLocaleString("en-US", { maximumFractionDigits: 0 })}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
       )}
     </div>
   );

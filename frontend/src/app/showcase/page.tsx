@@ -1,0 +1,42 @@
+import React from "react";
+import type { Metadata } from "next";
+import { ShowcaseNav } from "@/components/showcase/ShowcaseNav";
+import { Hero } from "@/components/showcase/Hero";
+import { Approach } from "@/components/showcase/Approach";
+import { ProductSurfaces } from "@/components/showcase/ProductSurfaces";
+import { Closing } from "@/components/showcase/Closing";
+import { ShowcaseFooter } from "@/components/showcase/ShowcaseFooter";
+
+export const metadata: Metadata = {
+  title: "ClearGig — Project Estimates, Considered",
+  description:
+    "Bring your scope, rates and recurring costs into one considered estimate. Ready for the next client conversation.",
+};
+
+export default function ShowcasePage() {
+  return (
+    <div className="min-h-screen bg-canvas text-ink flex flex-col font-sans selection:bg-accent-wash selection:text-forest">
+      {/* Keyboard skip link for accessibility */}
+      <a
+        href="#showcase-main"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-forest focus:text-paper focus:rounded-control focus:shadow-md"
+      >
+        Skip to main content
+      </a>
+
+      {/* Showcase dedicated navigation */}
+      <ShowcaseNav />
+
+      {/* Main showcase container */}
+      <main id="showcase-main" className="flex-1">
+        <Hero />
+        <Approach />
+        <ProductSurfaces />
+        <Closing />
+      </main>
+
+      {/* Complete Considered Work showcase footer */}
+      <ShowcaseFooter />
+    </div>
+  );
+}
