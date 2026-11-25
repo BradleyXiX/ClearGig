@@ -65,6 +65,9 @@ function loadComponent<T = Record<string, React.ComponentType<Record<string, unk
     if (id === "./BrandBar" || id.includes("BrandBar")) {
       return loadComponent("src/components/BrandBar.tsx");
     }
+    if (id === "@/lib/contact" || id.includes("contact")) {
+      return loadComponent("src/lib/contact.ts");
+    }
     if (id.includes("BrandMark")) {
       const MockBrandMark = ({ size, className }: { size?: number; className?: string }) =>
         React.createElement("svg", { className, width: size, height: size });
@@ -427,6 +430,22 @@ test("ShowcaseFooter: renders dark ink field, light wordmark, phrase, authentic 
   assert.match(html, /href="\/dashboard"[^>]*>[\s\S]*?Workspace/);
   assert.match(html, /href="#approach"[^>]*>[\s\S]*?The approach/);
   assert.match(html, /href="#workspace"[^>]*>[\s\S]*?Inside ClearGig/);
+
+  // Enquiries / Contact section
+  assert.match(html, /id="contact"/);
+  assert.match(html, /aria-labelledby="contact-heading"/);
+  assert.match(html, /GET IN TOUCH/);
+  assert.match(html, /Have a project in mind\?/);
+  assert.match(html, /Questions about ClearGig or interested in an implementation for your business\? Get in touch with Bradley\./);
+  assert.match(html, /Email Bradley/);
+  assert.match(html, /mailto:Bradjohn70@gmail\.com\?subject=ClearGig%20enquiry/);
+  assert.match(html, /Bradjohn70@gmail\.com/);
+  assert.match(html, /Chat on WhatsApp/);
+  assert.match(html, /https:\/\/wa\.me\/254703966756\?text=Hi%20Bradley%2C%20I%27d%20like%20to%20discuss%20ClearGig\./);
+  assert.match(html, /\+254 703 966 756/);
+  assert.match(html, /GitHub · BradleyXiX/);
+  assert.match(html, /https:\/\/github\.com\/BradleyXiX/);
+  assert.match(html, /Email opens your mail app\. WhatsApp opens a conversation—you send the message\./);
 
   // Copyright and disclosure (no fake legal links or licensing claims)
   assert.match(html, /© 2026 ClearGig\. All rights reserved\./);
@@ -894,4 +913,33 @@ test("Showcase Motion: controller initializes from actual media-query and resist
   } finally {
     globalObj.window = prevWindow;
   }
+});
+
+test("AppShell: renders compact no-print contact footer on standard app routes and omits it on showcase", () => {
+  const { AppShell } = loadComponent<{
+    AppShell: typeof import("../components/AppShell").AppShell;
+  }>("src/components/AppShell.tsx");
+
+  // Standard app route: /dashboard
+  const appHtml = ReactDOMServer.renderToStaticMarkup(
+    React.createElement(AppShell, { pathname: "/dashboard", children: React.createElement("div", null, "Dashboard Content") })
+  );
+  assert.match(appHtml, /<main><div>Dashboard Content<\/div><\/main>/);
+  assert.match(appHtml, /<footer[^>]*class="[^"]*no-print[^"]*"[^>]*>/);
+  assert.match(appHtml, /Questions or implementation enquiries\?/);
+  assert.match(appHtml, /Email Bradley/);
+  assert.match(appHtml, /mailto:Bradjohn70@gmail\.com\?subject=ClearGig%20enquiry/);
+  assert.match(appHtml, /WhatsApp/);
+  assert.match(appHtml, /https:\/\/wa\.me\/254703966756\?text=Hi%20Bradley%2C%20I%27d%20like%20to%20discuss%20ClearGig\./);
+  assert.match(appHtml, /GitHub/);
+  assert.match(appHtml, /https:\/\/github\.com\/BradleyXiX/);
+
+  // Showcase route: /showcase (Showcase owns its complete footer; AppShell must not render a duplicate footer)
+  const showcaseHtml = ReactDOMServer.renderToStaticMarkup(
+    React.createElement(AppShell, { pathname: "/showcase", children: React.createElement("div", null, "Showcase Content") })
+  );
+  assert.doesNotMatch(showcaseHtml, /<main>/);
+  assert.doesNotMatch(showcaseHtml, /<footer/);
+  assert.doesNotMatch(showcaseHtml, /Questions or implementation enquiries\?/);
+  assert.equal(showcaseHtml, "<div>Showcase Content</div>");
 });

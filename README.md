@@ -152,6 +152,15 @@ Client ──< Project ──< LineItem
 
 ---
 
+## 📬 Contact & Enquiries
+
+Have a question about ClearGig or interested in discussing an implementation? Get in touch with Bradley:
+- **Email:** [Bradjohn70@gmail.com](mailto:Bradjohn70@gmail.com?subject=ClearGig%20enquiry)
+- **WhatsApp:** [+254 703 966 756](https://wa.me/254703966756?text=Hi%20Bradley%2C%20I%27d%20like%20to%20discuss%20ClearGig.)
+- **GitHub:** [BradleyXiX](https://github.com/BradleyXiX)
+
+---
+
 ## 📄 License & Distribution Notice
 
 No repository-wide license file is currently present in the root checkout. Existing package-level notices remain applicable (e.g. backend package metadata specifies ISC). A repository-wide license decision must be established separately by the project owner prior to making general distribution or licensing claims.
